@@ -1,0 +1,1827 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Kyungjun Jarvis OS</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0c0f14;
+      --panel: #151a22;
+      --panel-2: #1c2330;
+      --line: #2a3443;
+      --text: #eef3f8;
+      --muted: #94a3b8;
+      --blue: #58a6ff;
+      --green: #5ee0a0;
+      --gold: #f6c85f;
+      --red: #ff7a8a;
+      --ink: #10151d;
+      --shadow: 0 22px 80px rgba(0, 0, 0, .34);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Inter", "Pretendard", "Noto Sans KR", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(88,166,255,.22), transparent 34rem),
+        linear-gradient(135deg, rgba(94,224,160,.08), transparent 26rem),
+        var(--bg);
+      color: var(--text);
+    }
+
+    button, input, textarea {
+      font: inherit;
+    }
+
+    button {
+      border: 0;
+      cursor: pointer;
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: 280px minmax(0, 1fr);
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      padding: 28px 22px;
+      border-right: 1px solid var(--line);
+      background: rgba(12, 15, 20, .76);
+      backdrop-filter: blur(18px);
+    }
+
+    .brand {
+      display: grid;
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+
+    .mark {
+      width: 46px;
+      height: 46px;
+      border-radius: 14px;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(135deg, var(--blue), var(--green));
+      color: var(--ink);
+      font-weight: 900;
+      box-shadow: 0 12px 30px rgba(88,166,255,.25);
+    }
+
+    h1, h2, h3, p {
+      margin: 0;
+    }
+
+    h1 {
+      font-size: 22px;
+      letter-spacing: 0;
+      line-height: 1.15;
+    }
+
+    .sub {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    nav {
+      display: grid;
+      gap: 8px;
+    }
+
+    .nav-group {
+      display: grid;
+      gap: 7px;
+      margin-top: 14px;
+    }
+
+    .nav-group:first-child {
+      margin-top: 0;
+    }
+
+    .nav-heading {
+      padding: 0 10px 3px;
+      color: var(--green);
+      font-size: 12px;
+      font-weight: 900;
+    }
+
+    .nav-btn {
+      display: grid;
+      grid-template-columns: 28px 1fr auto;
+      align-items: center;
+      width: 100%;
+      min-height: 44px;
+      padding: 9px 10px;
+      border-radius: 8px;
+      color: var(--muted);
+      background: transparent;
+      text-align: left;
+    }
+
+    .nav-btn.active,
+    .nav-btn:hover {
+      color: var(--text);
+      background: var(--panel-2);
+    }
+
+    .nav-icon {
+      font-size: 18px;
+    }
+
+    .nav-count {
+      min-width: 24px;
+      height: 22px;
+      display: grid;
+      place-items: center;
+      border-radius: 999px;
+      background: rgba(255,255,255,.07);
+      font-size: 12px;
+    }
+
+    main {
+      padding: 30px;
+      min-width: 0;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      align-items: flex-start;
+      margin-bottom: 24px;
+    }
+
+    .headline {
+      display: grid;
+      gap: 8px;
+    }
+
+    .headline h2 {
+      font-size: 34px;
+      line-height: 1.08;
+      letter-spacing: 0;
+    }
+
+    .status {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 34px;
+      padding: 7px 12px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--muted);
+      background: rgba(21, 26, 34, .7);
+      white-space: nowrap;
+    }
+
+    .pulse {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 0 6px rgba(94,224,160,.1);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(320px, .9fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .stack {
+      display: grid;
+      gap: 18px;
+    }
+
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(21, 26, 34, .86);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 18px 18px 0;
+    }
+
+    .card-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 17px;
+      font-weight: 800;
+    }
+
+    .section-controls {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+    }
+
+    .symbol {
+      width: 32px;
+      height: 32px;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(88,166,255,.15);
+      color: var(--blue);
+      font-size: 18px;
+    }
+
+    .body {
+      padding: 18px;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 190px;
+      gap: 18px;
+      align-items: stretch;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: linear-gradient(135deg, rgba(88,166,255,.18), rgba(94,224,160,.08) 48%, rgba(246,200,95,.12));
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .hero-copy {
+      padding: 22px;
+      display: grid;
+      gap: 18px;
+    }
+
+    .hero-copy h2 {
+      font-size: 28px;
+      line-height: 1.16;
+    }
+
+    .hero-art {
+      position: relative;
+      min-height: 190px;
+      background:
+        linear-gradient(160deg, rgba(238,243,248,.16), transparent 58%),
+        #111821;
+      overflow: hidden;
+    }
+
+    .hero-art::before {
+      content: "";
+      position: absolute;
+      inset: 20px;
+      border: 1px solid rgba(238,243,248,.22);
+      border-radius: 8px;
+      background:
+        linear-gradient(90deg, rgba(88,166,255,.5) 0 24%, transparent 24% 100%),
+        linear-gradient(rgba(255,255,255,.06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.06) 1px, transparent 1px);
+      background-size: 100% 100%, 24px 24px, 24px 24px;
+    }
+
+    .hero-art::after {
+      content: "";
+      position: absolute;
+      right: 34px;
+      bottom: 34px;
+      width: 86px;
+      height: 86px;
+      border-radius: 50%;
+      background: conic-gradient(var(--green) 0 42%, var(--gold) 42% 72%, rgba(255,255,255,.18) 72%);
+      box-shadow: 0 16px 36px rgba(0,0,0,.3);
+    }
+
+    .quick-metrics {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .metric {
+      padding: 14px;
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 8px;
+      background: rgba(12,15,20,.42);
+    }
+
+    .metric strong {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 22px;
+    }
+
+    .metric span {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .priorities {
+      display: grid;
+      gap: 10px;
+    }
+
+    .priority {
+      display: grid;
+      grid-template-columns: 34px 1fr;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .rank {
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      background: rgba(246,200,95,.16);
+      color: var(--gold);
+      font-weight: 800;
+    }
+
+    input[type="text"], input[type="number"], textarea {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(12,15,20,.42);
+      color: var(--text);
+      padding: 11px 12px;
+      outline: none;
+    }
+
+    textarea {
+      min-height: 96px;
+      resize: vertical;
+      line-height: 1.5;
+    }
+
+    input[type="text"]:focus, input[type="number"]:focus, textarea:focus {
+      border-color: var(--blue);
+      box-shadow: 0 0 0 3px rgba(88,166,255,.12);
+    }
+
+    .check-list {
+      display: grid;
+      gap: 9px;
+    }
+
+    .check-item {
+      display: grid;
+      grid-template-columns: 22px 1fr auto;
+      gap: 10px;
+      align-items: center;
+      min-height: 38px;
+      padding: 8px 10px;
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 8px;
+      background: rgba(12,15,20,.34);
+    }
+
+    input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--green);
+    }
+
+    .check-item.done span {
+      color: var(--muted);
+      text-decoration: line-through;
+    }
+
+    .ghost-btn,
+    .primary-btn,
+    .icon-btn {
+      min-height: 36px;
+      border-radius: 8px;
+      color: var(--text);
+      background: rgba(255,255,255,.07);
+      border: 1px solid rgba(255,255,255,.08);
+    }
+
+    .primary-btn {
+      background: linear-gradient(135deg, var(--blue), var(--green));
+      color: var(--ink);
+      font-weight: 800;
+      padding: 0 14px;
+    }
+
+    .ghost-btn {
+      padding: 0 12px;
+    }
+
+    .ghost-btn.active-edit {
+      background: linear-gradient(135deg, var(--blue), var(--green));
+      color: var(--ink);
+      font-weight: 800;
+    }
+
+    .icon-btn {
+      width: 36px;
+      display: grid;
+      place-items: center;
+      color: var(--muted);
+    }
+
+    .mini-form {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .section-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .module {
+      padding: 14px;
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 8px;
+      background: rgba(12,15,20,.28);
+      min-height: 146px;
+    }
+
+    .module h3 {
+      font-size: 15px;
+      margin-bottom: 12px;
+    }
+
+    .module.editing {
+      display: grid;
+      gap: 12px;
+    }
+
+    .edit-grid {
+      display: grid;
+      gap: 9px;
+    }
+
+    .edit-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(90px, .45fr);
+      gap: 8px;
+      align-items: center;
+    }
+
+    .edit-label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .worship-page {
+      grid-column: 1 / -1;
+      display: grid;
+      gap: 14px;
+      padding: 16px;
+      border: 1px solid rgba(94,224,160,.22);
+      border-radius: 8px;
+      background: linear-gradient(135deg, rgba(94,224,160,.12), rgba(88,166,255,.08));
+    }
+
+    .worship-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      align-items: flex-start;
+    }
+
+    .worship-header h3 {
+      font-size: 18px;
+      margin: 0 0 6px;
+    }
+
+    .worship-fields {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(120px, .4fr);
+      gap: 12px;
+    }
+
+    .field {
+      display: grid;
+      gap: 7px;
+    }
+
+    .field label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .field.wide {
+      grid-column: 1 / -1;
+    }
+
+    .health-tracker {
+      grid-column: 1 / -1;
+      display: grid;
+      gap: 14px;
+      padding: 16px;
+      border: 1px solid rgba(88,166,255,.22);
+      border-radius: 8px;
+      background: linear-gradient(135deg, rgba(88,166,255,.12), rgba(246,200,95,.08));
+    }
+
+    .tracker-summary {
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      align-items: flex-start;
+    }
+
+    .tracker-summary h3 {
+      font-size: 18px;
+      margin: 0 0 6px;
+    }
+
+    .rate-badge {
+      min-width: 82px;
+      min-height: 48px;
+      display: grid;
+      place-items: center;
+      border-radius: 8px;
+      background: rgba(12,15,20,.46);
+      color: var(--green);
+      font-size: 22px;
+      font-weight: 900;
+    }
+
+    .goal-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .goal-card {
+      display: grid;
+      gap: 10px;
+      min-height: 134px;
+      padding: 14px;
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 8px;
+      background: rgba(12,15,20,.34);
+    }
+
+    .goal-card header {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .goal-card h4 {
+      margin: 0;
+      font-size: 15px;
+    }
+
+    .goal-card input[type="number"] {
+      width: 100%;
+      height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(12,15,20,.42);
+      color: var(--text);
+      padding: 8px 10px;
+      outline: none;
+    }
+
+    .ceo-dashboard {
+      grid-column: 1 / -1;
+      display: grid;
+      gap: 14px;
+    }
+
+    .ceo-panel {
+      padding: 16px;
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 8px;
+      background: rgba(12,15,20,.34);
+    }
+
+    .ceo-panel h3 {
+      margin: 0 0 12px;
+      font-size: 18px;
+    }
+
+    .ceo-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .ceo-field {
+      display: grid;
+      gap: 7px;
+    }
+
+    .ceo-field > span,
+    .ceo-field label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .ceo-total {
+      display: grid;
+      gap: 5px;
+      padding: 14px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, rgba(94,224,160,.16), rgba(88,166,255,.1));
+      border: 1px solid rgba(94,224,160,.24);
+    }
+
+    .ceo-total span {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .ceo-total strong {
+      font-size: 24px;
+      color: var(--green);
+    }
+
+    .rows {
+      display: grid;
+      gap: 8px;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: center;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .tag {
+      padding: 5px 8px;
+      border-radius: 999px;
+      background: rgba(88,166,255,.12);
+      color: #a9d2ff;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+
+    .tag.green { background: rgba(94,224,160,.13); color: #a9f0cb; }
+    .tag.gold { background: rgba(246,200,95,.14); color: #ffe09a; }
+    .tag.red { background: rgba(255,122,138,.14); color: #ffb7c0; }
+
+    .bars {
+      display: grid;
+      gap: 12px;
+    }
+
+    .bar-label {
+      display: flex;
+      justify-content: space-between;
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 6px;
+    }
+
+    .bar {
+      height: 8px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.08);
+      overflow: hidden;
+    }
+
+    .bar > i {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--blue), var(--green));
+    }
+
+    .market {
+      display: grid;
+      gap: 10px;
+    }
+
+    .stock-dashboard {
+      display: grid;
+      gap: 12px;
+    }
+
+    .stock-row {
+      display: grid;
+      grid-template-columns: minmax(120px, 1.2fr) minmax(96px, .8fr) minmax(96px, .8fr) 78px;
+      gap: 10px;
+      align-items: center;
+      padding: 12px;
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 8px;
+      background: rgba(255,255,255,.05);
+    }
+
+    .stock-name b {
+      display: block;
+      font-size: 14px;
+    }
+
+    .stock-name small {
+      color: var(--muted);
+    }
+
+    .stock-field {
+      display: grid;
+      gap: 5px;
+    }
+
+    .stock-field label {
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .stock-field input {
+      width: 100%;
+      height: 34px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(12,15,20,.42);
+      color: var(--text);
+      padding: 7px 9px;
+      outline: none;
+    }
+
+    .profit-box {
+      display: grid;
+      place-items: center;
+      min-height: 34px;
+      border-radius: 8px;
+      background: rgba(255,255,255,.06);
+      font-weight: 800;
+      font-size: 13px;
+    }
+
+    .stock-notes {
+      grid-column: 1 / -1;
+      min-height: 72px;
+    }
+
+    .ticker {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      gap: 12px;
+      align-items: center;
+      min-height: 44px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: rgba(255,255,255,.05);
+    }
+
+    .ticker b {
+      display: block;
+      font-size: 14px;
+    }
+
+    .ticker small {
+      color: var(--muted);
+    }
+
+    .up { color: var(--green); }
+    .down { color: var(--red); }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .tab {
+      min-height: 34px;
+      padding: 0 12px;
+      border-radius: 8px;
+      color: var(--muted);
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.08);
+    }
+
+    .tab.active {
+      color: var(--ink);
+      background: var(--green);
+      font-weight: 800;
+    }
+
+    .hide {
+      display: none;
+    }
+
+    @media (max-width: 1120px) {
+      .app { grid-template-columns: 1fr; }
+      .sidebar {
+        position: static;
+        height: auto;
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+      }
+      nav { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .grid { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 760px) {
+      main { padding: 18px; }
+      .topbar { display: grid; }
+      .card-head { align-items: flex-start; flex-direction: column; }
+      .section-controls { width: 100%; justify-content: flex-start; }
+      .headline h2 { font-size: 28px; }
+      .hero { grid-template-columns: 1fr; }
+      .hero-art { min-height: 130px; }
+      .quick-metrics,
+      .section-grid,
+      nav { grid-template-columns: 1fr; }
+      .worship-fields { grid-template-columns: 1fr; }
+      .worship-header { display: grid; }
+      .tracker-summary { display: grid; }
+      .goal-grid { grid-template-columns: 1fr; }
+      .ceo-grid { grid-template-columns: 1fr; }
+      .field.wide { grid-column: auto; }
+      .edit-row { grid-template-columns: 1fr; }
+      .ticker { grid-template-columns: 1fr auto; }
+      .ticker small { grid-column: 1 / -1; }
+      .stock-row { grid-template-columns: 1fr; }
+      .stock-notes { grid-column: auto; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="mark">KJ</div>
+        <div>
+          <h1>Kyungjun<br>Jarvis OS</h1>
+          <p class="sub">비즈니스, 가족, 신앙, 건강을 한 화면에서 정리합니다.</p>
+        </div>
+      </div>
+      <nav id="nav"></nav>
+    </aside>
+
+    <main>
+      <div class="topbar">
+        <div class="headline">
+          <p class="sub" id="today"></p>
+          <h2>오늘의 운영 대시보드</h2>
+        </div>
+        <div class="status">
+          <span class="pill"><i class="pulse"></i>로컬 저장 활성화</span>
+          <span class="pill" id="completeRate">완료율 0%</span>
+        </div>
+      </div>
+
+      <section class="hero">
+        <div class="hero-copy">
+          <div>
+            <h2>이번 주의 핵심을 선명하게 유지하세요.</h2>
+            <p class="sub">우선순위, 실행 체크리스트, 시장 메모, 가족과 사역 프로젝트를 빠르게 갱신할 수 있습니다.</p>
+          </div>
+          <div class="quick-metrics">
+            <div class="metric"><strong id="metricDone">0</strong><span>오늘 완료</span></div>
+            <div class="metric"><strong>3</strong><span>주간 우선순위</span></div>
+            <div class="metric"><strong>2</strong><span>상위 그룹</span></div>
+            <div class="metric"><strong id="metricOpen">0</strong><span>진행 항목</span></div>
+          </div>
+        </div>
+        <div class="hero-art" aria-label="dashboard visualization"></div>
+      </section>
+
+      <div class="grid" style="margin-top:18px;">
+        <div class="stack">
+          <section class="card">
+            <div class="card-head">
+              <div class="card-title"><span class="symbol">★</span>주간 Top 3 우선순위</div>
+              <button class="ghost-btn" id="resetPriorities">초기화</button>
+            </div>
+            <div class="body priorities" id="priorityList"></div>
+          </section>
+
+          <section class="card">
+            <div class="card-head">
+              <div class="card-title"><span class="symbol">✓</span>Daily Checklist</div>
+              <button class="primary-btn" id="addTask">추가</button>
+            </div>
+            <div class="body">
+              <div class="check-list" id="taskList"></div>
+              <div class="mini-form">
+                <input id="newTask" type="text" placeholder="새 체크 항목" />
+                <button class="ghost-btn" id="clearDone">완료 정리</button>
+              </div>
+            </div>
+          </section>
+
+          <section class="card">
+            <div class="card-head">
+              <div class="card-title"><span class="symbol">▦</span>섹션별 관리</div>
+              <div class="section-controls">
+                <button class="ghost-btn" id="editModeToggle">편집 모드</button>
+                <div class="tabs" id="tabs"></div>
+              </div>
+            </div>
+            <div class="body">
+              <div class="section-grid" id="modules"></div>
+            </div>
+          </section>
+        </div>
+
+        <aside class="stack">
+          <section class="card">
+            <div class="card-head">
+              <div class="card-title"><span class="symbol">₩</span>한국 주식 대시보드</div>
+              <span class="tag green">보유종목</span>
+            </div>
+            <div class="body stock-dashboard" id="krMarket"></div>
+          </section>
+
+          <section class="card">
+            <div class="card-head">
+              <div class="card-title"><span class="symbol">$</span>미국 주식시장</div>
+              <span class="tag gold">장기</span>
+            </div>
+            <div class="body market" id="usMarket"></div>
+          </section>
+
+          <section class="card">
+            <div class="card-head">
+              <div class="card-title"><span class="symbol">⌁</span>주간 리듬</div>
+            </div>
+            <div class="body bars" id="rhythm"></div>
+          </section>
+        </aside>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const sections = [
+      { id: "business", group: "corporate", groupLabel: "법인", icon: "◆", label: "Azer Design Dashboard", detail: "브랜드·고객·매출", count: 4 },
+      { id: "activeProjects", group: "corporate", groupLabel: "법인", icon: "▦", label: "Active Projects", detail: "진행 프로젝트", count: 3 },
+      { id: "accountsReceivable", group: "corporate", groupLabel: "법인", icon: "₩", label: "Accounts Receivable", detail: "미수금 관리", count: 3 },
+      { id: "companyCashFlow", group: "corporate", groupLabel: "법인", icon: "⌁", label: "Company Cash Flow", detail: "현금흐름", count: 3 },
+      { id: "staff", group: "corporate", groupLabel: "법인", icon: "◫", label: "Staff and Subcontractors", detail: "직원·외주", count: 4 },
+      { id: "taxDividends", group: "corporate", groupLabel: "법인", icon: "◇", label: "Tax and Dividends", detail: "세무·배당", count: 4 },
+      { id: "personalNetWorth", group: "personal", groupLabel: "개인", icon: "◈", label: "Personal Net Worth", detail: "순자산", count: 5 },
+      { id: "invest", group: "personal", groupLabel: "개인", icon: "▴", label: "Investments", detail: "시장·포트폴리오", count: 5 },
+      { id: "realEstate", group: "personal", groupLabel: "개인", icon: "⌂", label: "Real Estate", detail: "부동산", count: 3 },
+      { id: "family", group: "personal", groupLabel: "개인", icon: "☷", label: "Family Schedule", detail: "가족 일정", count: 3 },
+      { id: "health", group: "personal", groupLabel: "개인", icon: "●", label: "Health", detail: "운동·회복", count: 4 },
+      { id: "church", group: "personal", groupLabel: "개인", icon: "✣", label: "Church Ministry", detail: "예배 준비", count: 4 },
+      { id: "immigration", group: "personal", groupLabel: "개인", icon: "◬", label: "Immigration and Education", detail: "이민·교육", count: 6 }
+    ];
+
+    const defaultModuleData = {
+      ceo: [
+        { title: "CEO Focus", rows: [["순자산", "자동 계산"], ["사업 현금흐름", "점검"], ["가족·건강 균형", "관리"]]},
+        { title: "이번 주 의사결정", rows: [["투자 검토", "대기"], ["미수금 확인", "진행"], ["가족 일정", "확정"]]}
+      ],
+      business: [
+        { title: "Azer Design", rows: [["이번 주 제안서", "작성"], ["고객 후속 연락", "대기"], ["브랜드 자산 정리", "진행"]]},
+        { title: "매출 파이프라인", rows: [["신규 리드", "5건"], ["견적 검토", "2건"], ["수금 확인", "금요일"]]}
+      ],
+      activeProjects: [
+        { title: "진행 프로젝트", rows: [["활성 프로젝트", "6건"], ["이번 주 납품", "2건"], ["리스크 프로젝트", "1건"]]},
+        { title: "프로젝트 우선순위", rows: [["Azer 리브랜딩", "집중"], ["신규 제안서", "작성"], ["고객 피드백", "대기"]]}
+      ],
+      accountsReceivable: [
+        { title: "미수금 관리", rows: [["총 미수금", "35,000,000원"], ["이번 주 수금", "확인"], ["장기 미수", "검토"]]},
+        { title: "청구 일정", rows: [["세금계산서", "발행"], ["입금 확인", "금요일"], ["후속 연락", "필요"]]}
+      ],
+      companyCashFlow: [
+        { title: "법인 현금흐름", rows: [["월 매출", "48,000,000원"], ["고정비", "점검"], ["운영 현금", "관리"]]},
+        { title: "자금 계획", rows: [["세금 준비금", "분리"], ["배당 여력", "검토"], ["투자 예산", "보류"]]}
+      ],
+      staff: [
+        { title: "직원 관리", rows: [["정규 직원", "확인"], ["업무 배분", "조정"], ["성과 체크인", "주간"]]},
+        { title: "외주 파트너", rows: [["진행 외주", "3명"], ["계약 상태", "검토"], ["지급 일정", "확인"]]}
+      ],
+      taxDividends: [
+        { title: "세무 관리", rows: [["부가세", "준비"], ["법인세", "예상"], ["증빙 자료", "정리"]]},
+        { title: "배당 계획", rows: [["배당 가능액", "검토"], ["현금흐름 영향", "확인"], ["개인 세금", "상담"]]}
+      ],
+      invest: [
+        { title: "포트폴리오 점검", rows: [["현금 비중", "확인"], ["리밸런싱", "월말"], ["리스크 메모", "작성"]]},
+        { title: "시장 메모", rows: [["환율", "관찰"], ["금리", "보류"], ["실적 발표", "체크"]]}
+      ],
+      family: [
+        { title: "Children Education", rows: [["독서 루틴", "주 4회"], ["영어 학습", "20분"], ["학교 일정", "확인"]]},
+        { title: "가족 시간", rows: [["주말 계획", "예약"], ["부모님 연락", "완료"], ["가정 예배", "준비"]]}
+      ],
+      realEstate: [
+        { title: "부동산 자산", rows: [["보유 부동산", "650,000,000원"], ["대출 잔액", "확인"], ["임대/관리", "점검"]]},
+        { title: "부동산 계획", rows: [["시세 점검", "월 1회"], ["수리/관리", "예정"], ["세금 일정", "확인"]]}
+      ],
+      church: [
+        { title: "Worship Preparation", rows: [["찬양 리스트", "확정"], ["기도 제목", "정리"], ["말씀 본문", "묵상"]]},
+        { title: "Ministry Follow-up", rows: [["팀 연락", "수요일"], ["봉사 배치", "확인"], ["새가족 케어", "진행"]]}
+      ],
+      health: [
+        { title: "Golf Tracking", rows: [["라운드 목표", "90타"], ["스윙 연습", "2회"], ["퍼팅", "30분"]]},
+        { title: "Tennis Tracking", rows: [["레슨", "화/목"], ["서브 정확도", "60%"], ["스트레칭", "매일"]]}
+      ],
+      immigration: [
+        { title: "Immigration Project", rows: [["서류 목록", "검토"], ["마감일", "캘린더"], ["변호사 문의", "예약"]]},
+        { title: "Education Path", rows: [["학교 리서치", "진행"], ["학비 계획", "초안"], ["지원 일정", "정리"]]}
+      ]
+    };
+
+    const defaultPriorities = [
+      "Azer Design 핵심 고객 3곳 후속 조치",
+      "이민 프로젝트 서류 진행상황 업데이트",
+      "가족·사역·건강 루틴 균형 점검"
+    ];
+
+    const defaultTasks = [
+      { text: "아침 기도와 하루 계획 확인", done: false },
+      { text: "주요 고객·투자 메모 15분 정리", done: false },
+      { text: "운동 또는 스트레칭 완료", done: false },
+      { text: "아이들 교육 체크인", done: false },
+      { text: "저녁 회고 기록", done: false }
+    ];
+
+    const defaultKoreanStocks = [
+      { symbol: "005930", name: "삼성전자", purchase: 72000, current: 76000, notes: "반도체 사이클과 배당 관점에서 장기 추적" },
+      { symbol: "000660", name: "SK하이닉스", purchase: 185000, current: 210000, notes: "HBM 수요와 AI 서버 투자 흐름 확인" },
+      { symbol: "267260", name: "HD현대일렉트릭", purchase: 285000, current: 320000, notes: "전력기기 수주, 북미 인프라 투자 모니터링" }
+    ];
+
+    const defaultWorshipPreparation = {
+      songTitle: "주님의 은혜",
+      key: "G",
+      leaderNotes: "찬양 시작 전 짧은 묵상 멘트 준비. 회중이 가사를 천천히 고백하도록 템포를 안정적으로 유지.",
+      prayerTopics: "예배 가운데 하나님의 임재를 구하기\n가정과 다음 세대의 믿음 성장을 위해 기도하기\n교회 공동체의 회복과 섬김을 위해 기도하기"
+    };
+
+    const defaultHealthTracker = {
+      tennis: 0,
+      golf: 0,
+      sleep: 6.5
+    };
+
+    const defaultCeoDashboard = {
+      netWorth: {
+        cash: 50000000,
+        investments: 180000000,
+        realEstate: 650000000,
+        liabilities: 220000000
+      },
+      business: {
+        activeProjects: 6,
+        accountsReceivable: 35000000,
+        monthlyRevenue: 48000000
+      },
+      family: {
+        weeklySchedule: "월: 가족 식사\n수: 아이들 학습 체크\n토: 가족 외출",
+        childrenEducation: "독서, 영어, 학교 일정 점검"
+      },
+      health: {
+        tennisTracker: "이번 주 1회 목표",
+        golfTracker: "스윙 연습 1회, 라운드 준비",
+        weightTracker: "목표 체중과 주간 변화 기록"
+      }
+    };
+
+    const defaultUsMarket = [
+      ["S&P 500", "시장 기준", "+0.5%", "up"],
+      ["NVDA", "AI 반도체", "+1.6%", "up"],
+      ["AAPL", "소비재·서비스", "-0.2%", "down"],
+      ["MSFT", "클라우드", "+0.7%", "up"]
+    ];
+
+    const defaultRhythm = [
+      ["예배 준비", 72],
+      ["골프 연습", 45],
+      ["테니스 루틴", 64],
+      ["이민 프로젝트", 58],
+      ["자녀 교육", 80]
+    ];
+
+    const store = {
+      get(key, fallback) {
+        try { return JSON.parse(localStorage.getItem(key)) ?? fallback; }
+        catch { return fallback; }
+      },
+      set(key, value) {
+        localStorage.setItem(key, JSON.stringify(value));
+      }
+    };
+
+    let active = "business";
+    let priorities = store.get("kj-priorities", defaultPriorities);
+    let tasks = store.get("kj-tasks", defaultTasks);
+    let moduleData = store.get("kj-module-data", defaultModuleData);
+    const missingModuleKeys = Object.keys(defaultModuleData).filter(key => !moduleData[key]);
+    if (missingModuleKeys.length) {
+      moduleData = { ...defaultModuleData, ...moduleData };
+      store.set("kj-module-data", moduleData);
+    }
+    let koreanStocks = store.get("kj-korean-stocks", defaultKoreanStocks);
+    let worshipPreparation = store.get("kj-worship-preparation", defaultWorshipPreparation);
+    let healthTracker = store.get("kj-health-tracker", defaultHealthTracker);
+    let ceoDashboard = store.get("kj-ceo-dashboard", defaultCeoDashboard);
+    let usMarket = store.get("kj-us-market", defaultUsMarket);
+    let rhythm = store.get("kj-rhythm", defaultRhythm);
+    let editMode = store.get("kj-edit-mode", false);
+
+    const nav = document.querySelector("#nav");
+    const tabs = document.querySelector("#tabs");
+    const modules = document.querySelector("#modules");
+    const priorityList = document.querySelector("#priorityList");
+    const taskList = document.querySelector("#taskList");
+    const editModeToggle = document.querySelector("#editModeToggle");
+
+    document.querySelector("#today").textContent = new Intl.DateTimeFormat("ko-KR", {
+      dateStyle: "full"
+    }).format(new Date());
+
+    function renderNav() {
+      editModeToggle.textContent = editMode ? "보기 모드" : "편집 모드";
+      editModeToggle.classList.toggle("active-edit", editMode);
+      const groups = [
+        { id: "corporate", label: "법인" },
+        { id: "personal", label: "개인" }
+      ];
+      nav.innerHTML = groups.map(group => `
+        <div class="nav-group">
+          <div class="nav-heading">${group.label}</div>
+          ${sections.filter(section => section.group === group.id).map(section => `
+            <button class="nav-btn ${active === section.id ? "active" : ""}" data-section="${section.id}">
+              <span class="nav-icon">${section.icon}</span>
+              <span><b>${section.label}</b><br><small>${section.detail}</small></span>
+              <span class="nav-count">${section.count}</span>
+            </button>
+          `).join("")}
+        </div>
+      `).join("");
+
+      const activeGroup = sections.find(section => section.id === active)?.group;
+      tabs.innerHTML = sections.filter(section => section.group === activeGroup).map(section => `
+        <button class="tab ${active === section.id ? "active" : ""}" data-section="${section.id}">
+          ${section.label}
+        </button>
+      `).join("");
+
+      document.querySelectorAll("[data-section]").forEach(button => {
+        button.addEventListener("click", () => {
+          active = button.dataset.section;
+          renderAll();
+        });
+      });
+    }
+
+    function renderCeoDashboard() {
+      const netWorth = ceoDashboard.netWorth;
+      const totalNetWorth =
+        (Number(netWorth.cash) || 0) +
+        (Number(netWorth.investments) || 0) +
+        (Number(netWorth.realEstate) || 0) -
+        (Number(netWorth.liabilities) || 0);
+
+      return `
+        <article class="ceo-dashboard">
+          <section class="ceo-panel">
+            <h3>순자산 대시보드</h3>
+            <div class="ceo-grid">
+              <label class="ceo-field">
+                <span>현금</span>
+                <input type="number" min="0" step="1000000" value="${Number(netWorth.cash) || 0}" data-ceo-group="netWorth" data-ceo-field="cash" />
+              </label>
+              <label class="ceo-field">
+                <span>투자 계좌</span>
+                <input type="number" min="0" step="1000000" value="${Number(netWorth.investments) || 0}" data-ceo-group="netWorth" data-ceo-field="investments" />
+              </label>
+              <label class="ceo-field">
+                <span>부동산</span>
+                <input type="number" min="0" step="1000000" value="${Number(netWorth.realEstate) || 0}" data-ceo-group="netWorth" data-ceo-field="realEstate" />
+              </label>
+              <label class="ceo-field">
+                <span>부채</span>
+                <input type="number" min="0" step="1000000" value="${Number(netWorth.liabilities) || 0}" data-ceo-group="netWorth" data-ceo-field="liabilities" />
+              </label>
+              <div class="ceo-total">
+                <span>총 순자산</span>
+                <strong id="ceoTotalNetWorth">${formatWon(totalNetWorth)}</strong>
+              </div>
+            </div>
+          </section>
+
+          <section class="ceo-panel">
+            <h3>비즈니스 대시보드</h3>
+            <div class="ceo-grid">
+              <label class="ceo-field">
+                <span>진행 중 프로젝트</span>
+                <input type="number" min="0" step="1" value="${Number(ceoDashboard.business.activeProjects) || 0}" data-ceo-group="business" data-ceo-field="activeProjects" />
+              </label>
+              <label class="ceo-field">
+                <span>미수금</span>
+                <input type="number" min="0" step="1000000" value="${Number(ceoDashboard.business.accountsReceivable) || 0}" data-ceo-group="business" data-ceo-field="accountsReceivable" />
+              </label>
+              <label class="ceo-field">
+                <span>월 매출</span>
+                <input type="number" min="0" step="1000000" value="${Number(ceoDashboard.business.monthlyRevenue) || 0}" data-ceo-group="business" data-ceo-field="monthlyRevenue" />
+              </label>
+            </div>
+          </section>
+
+          <section class="ceo-panel">
+            <h3>가족 대시보드</h3>
+            <div class="ceo-grid">
+              <label class="ceo-field">
+                <span>주간 일정</span>
+                <textarea data-ceo-group="family" data-ceo-field="weeklySchedule">${escapeHtml(ceoDashboard.family.weeklySchedule)}</textarea>
+              </label>
+              <label class="ceo-field">
+                <span>자녀 교육</span>
+                <textarea data-ceo-group="family" data-ceo-field="childrenEducation">${escapeHtml(ceoDashboard.family.childrenEducation)}</textarea>
+              </label>
+            </div>
+          </section>
+
+          <section class="ceo-panel">
+            <h3>건강 대시보드</h3>
+            <div class="ceo-grid">
+              <label class="ceo-field">
+                <span>테니스 트래커</span>
+                <textarea data-ceo-group="health" data-ceo-field="tennisTracker">${escapeHtml(ceoDashboard.health.tennisTracker)}</textarea>
+              </label>
+              <label class="ceo-field">
+                <span>골프 트래커</span>
+                <textarea data-ceo-group="health" data-ceo-field="golfTracker">${escapeHtml(ceoDashboard.health.golfTracker)}</textarea>
+              </label>
+              <label class="ceo-field">
+                <span>체중 트래커</span>
+                <textarea data-ceo-group="health" data-ceo-field="weightTracker">${escapeHtml(ceoDashboard.health.weightTracker)}</textarea>
+              </label>
+            </div>
+          </section>
+        </article>
+      `;
+    }
+
+    function renderPersonalNetWorthDashboard() {
+      const netWorth = ceoDashboard.netWorth;
+      const totalNetWorth =
+        (Number(netWorth.cash) || 0) +
+        (Number(netWorth.investments) || 0) +
+        (Number(netWorth.realEstate) || 0) -
+        (Number(netWorth.liabilities) || 0);
+
+      return `
+        <article class="ceo-dashboard">
+          <section class="ceo-panel">
+            <h3>개인 순자산</h3>
+            <div class="ceo-grid">
+              <label class="ceo-field">
+                <span>현금</span>
+                <input type="number" min="0" step="1000000" value="${Number(netWorth.cash) || 0}" data-ceo-group="netWorth" data-ceo-field="cash" />
+              </label>
+              <label class="ceo-field">
+                <span>투자 계좌</span>
+                <input type="number" min="0" step="1000000" value="${Number(netWorth.investments) || 0}" data-ceo-group="netWorth" data-ceo-field="investments" />
+              </label>
+              <label class="ceo-field">
+                <span>부동산</span>
+                <input type="number" min="0" step="1000000" value="${Number(netWorth.realEstate) || 0}" data-ceo-group="netWorth" data-ceo-field="realEstate" />
+              </label>
+              <label class="ceo-field">
+                <span>부채</span>
+                <input type="number" min="0" step="1000000" value="${Number(netWorth.liabilities) || 0}" data-ceo-group="netWorth" data-ceo-field="liabilities" />
+              </label>
+              <div class="ceo-total">
+                <span>총 순자산</span>
+                <strong id="ceoTotalNetWorth">${formatWon(totalNetWorth)}</strong>
+              </div>
+            </div>
+          </section>
+        </article>
+      `;
+    }
+
+    function renderCorporateMetricDashboard() {
+      const config = {
+        activeProjects: {
+          title: "진행 프로젝트",
+          label: "활성 프로젝트",
+          field: "activeProjects",
+          type: "number",
+          step: "1",
+          suffix: "건"
+        },
+        accountsReceivable: {
+          title: "미수금 관리",
+          label: "미수금",
+          field: "accountsReceivable",
+          type: "number",
+          step: "1000000",
+          suffix: "원"
+        },
+        companyCashFlow: {
+          title: "법인 현금흐름",
+          label: "월 매출",
+          field: "monthlyRevenue",
+          type: "number",
+          step: "1000000",
+          suffix: "원"
+        }
+      }[active];
+
+      if (!config) return "";
+      const value = Number(ceoDashboard.business[config.field]) || 0;
+
+      return `
+        <article class="ceo-dashboard">
+          <section class="ceo-panel">
+            <h3>${config.title}</h3>
+            <div class="ceo-grid">
+              <label class="ceo-field">
+                <span>${config.label}</span>
+                <input type="${config.type}" min="0" step="${config.step}" value="${value}" data-ceo-group="business" data-ceo-field="${config.field}" />
+              </label>
+              <div class="ceo-total">
+                <span>현재 값</span>
+                <strong>${config.suffix === "원" ? formatWon(value) : `${value}${config.suffix}`}</strong>
+              </div>
+            </div>
+          </section>
+        </article>
+      `;
+    }
+
+    function renderRealEstateDashboard() {
+      return `
+        <article class="ceo-dashboard">
+          <section class="ceo-panel">
+            <h3>부동산</h3>
+            <div class="ceo-grid">
+              <label class="ceo-field">
+                <span>부동산 평가액</span>
+                <input type="number" min="0" step="1000000" value="${Number(ceoDashboard.netWorth.realEstate) || 0}" data-ceo-group="netWorth" data-ceo-field="realEstate" />
+              </label>
+              <div class="ceo-total">
+                <span>현재 부동산 자산</span>
+                <strong id="ceoTotalNetWorth">${formatWon(ceoDashboard.netWorth.realEstate)}</strong>
+              </div>
+            </div>
+          </section>
+        </article>
+      `;
+    }
+
+    function bindCeoDashboard() {
+      modules.querySelectorAll("[data-ceo-group]").forEach(input => {
+        input.addEventListener("input", () => {
+          const group = input.dataset.ceoGroup;
+          const field = input.dataset.ceoField;
+          ceoDashboard[group][field] = input.type === "number" ? Number(input.value) : input.value;
+          store.set("kj-ceo-dashboard", ceoDashboard);
+
+          if (group === "netWorth") {
+            const netWorth = ceoDashboard.netWorth;
+            const total =
+              (Number(netWorth.cash) || 0) +
+              (Number(netWorth.investments) || 0) +
+              (Number(netWorth.realEstate) || 0) -
+              (Number(netWorth.liabilities) || 0);
+            document.querySelector("#ceoTotalNetWorth").textContent = formatWon(total);
+          }
+        });
+      });
+    }
+
+    function renderModules() {
+      const personalNetWorthPage = active === "personalNetWorth" ? renderPersonalNetWorthDashboard() : "";
+      const corporateMetricPage = renderCorporateMetricDashboard();
+      const realEstatePage = active === "realEstate" ? renderRealEstateDashboard() : "";
+      const worshipPage = active === "church" ? `
+        <article class="worship-page">
+          <div class="worship-header">
+            <div>
+              <h3>예배 준비 페이지</h3>
+              <p class="sub">이번 예배의 찬양, 키, 인도자 메모, 기도 제목을 정리합니다.</p>
+            </div>
+            <span class="tag green">로컬 저장</span>
+          </div>
+          <div class="worship-fields">
+            <div class="field">
+              <label for="worshipSongTitle">곡 제목</label>
+              <input id="worshipSongTitle" type="text" value="${escapeHtml(worshipPreparation.songTitle)}" data-worship="songTitle" />
+            </div>
+            <div class="field">
+              <label for="worshipKey">키</label>
+              <input id="worshipKey" type="text" value="${escapeHtml(worshipPreparation.key)}" data-worship="key" />
+            </div>
+            <div class="field wide">
+              <label for="worshipLeaderNotes">예배 인도자 메모</label>
+              <textarea id="worshipLeaderNotes" data-worship="leaderNotes">${escapeHtml(worshipPreparation.leaderNotes)}</textarea>
+            </div>
+            <div class="field wide">
+              <label for="worshipPrayerTopics">기도 제목</label>
+              <textarea id="worshipPrayerTopics" data-worship="prayerTopics">${escapeHtml(worshipPreparation.prayerTopics)}</textarea>
+            </div>
+          </div>
+        </article>
+      ` : "";
+
+      const healthDone = [
+        Number(healthTracker.tennis) >= 1,
+        Number(healthTracker.golf) >= 1,
+        Number(healthTracker.sleep) >= 7
+      ].filter(Boolean).length;
+      const healthRate = Math.round((healthDone / 3) * 100);
+      const healthPage = active === "health" ? `
+        <article class="health-tracker">
+          <div class="tracker-summary">
+            <div>
+              <h3>Health Tracker</h3>
+              <p class="sub">이번 주 운동과 수면 목표를 기록하고 완료율을 확인합니다.</p>
+            </div>
+            <div class="rate-badge" id="healthRate">${healthRate}%</div>
+          </div>
+          <div class="goal-grid">
+            <section class="goal-card">
+              <header>
+                <h4>테니스</h4>
+                <span class="tag ${Number(healthTracker.tennis) >= 1 ? "green" : ""}">목표 1회</span>
+              </header>
+              <div class="field">
+                <label for="healthTennis">이번 주 완료 횟수</label>
+                <input id="healthTennis" type="number" min="0" step="1" value="${Number(healthTracker.tennis) || 0}" data-health="tennis" />
+              </div>
+            </section>
+            <section class="goal-card">
+              <header>
+                <h4>골프</h4>
+                <span class="tag ${Number(healthTracker.golf) >= 1 ? "green" : ""}">목표 1회</span>
+              </header>
+              <div class="field">
+                <label for="healthGolf">이번 주 완료 횟수</label>
+                <input id="healthGolf" type="number" min="0" step="1" value="${Number(healthTracker.golf) || 0}" data-health="golf" />
+              </div>
+            </section>
+            <section class="goal-card">
+              <header>
+                <h4>수면</h4>
+                <span class="tag ${Number(healthTracker.sleep) >= 7 ? "green" : "gold"}">목표 7시간</span>
+              </header>
+              <div class="field">
+                <label for="healthSleep">평균 수면 시간</label>
+                <input id="healthSleep" type="number" min="0" max="24" step="0.5" value="${Number(healthTracker.sleep) || 0}" data-health="sleep" />
+              </div>
+            </section>
+          </div>
+        </article>
+      ` : "";
+
+      modules.innerHTML = personalNetWorthPage + corporateMetricPage + realEstatePage + worshipPage + healthPage + moduleData[active].map((module, moduleIndex) => {
+        if (editMode) {
+          return `
+            <article class="module editing">
+              <label class="field">
+                <span class="edit-label">카드 제목</span>
+                <input type="text" value="${escapeHtml(module.title)}" data-module-title="${moduleIndex}" />
+              </label>
+              <div class="edit-grid">
+                ${module.rows.map(([name, value], rowIndex) => `
+                  <div class="edit-row">
+                    <label class="field">
+                      <span class="edit-label">항목</span>
+                      <input type="text" value="${escapeHtml(name)}" data-module-row-name="${moduleIndex}" data-row="${rowIndex}" />
+                    </label>
+                    <label class="field">
+                      <span class="edit-label">상태</span>
+                      <input type="text" value="${escapeHtml(value)}" data-module-row-value="${moduleIndex}" data-row="${rowIndex}" />
+                    </label>
+                  </div>
+                `).join("")}
+              </div>
+            </article>
+          `;
+        }
+
+        return `
+          <article class="module">
+            <h3>${module.title}</h3>
+            <div class="rows">
+              ${module.rows.map(([name, value], index) => `
+                <div class="row">
+                  <span>${name}</span>
+                  <span class="tag ${index === 1 ? "gold" : index === 2 ? "green" : ""}">${value}</span>
+                </div>
+              `).join("")}
+            </div>
+          </article>
+        `;
+      }).join("");
+
+      modules.querySelectorAll("[data-worship]").forEach(input => {
+        input.addEventListener("input", () => {
+          worshipPreparation[input.dataset.worship] = input.value;
+          store.set("kj-worship-preparation", worshipPreparation);
+        });
+      });
+
+      bindCeoDashboard();
+
+      modules.querySelectorAll("[data-health]").forEach(input => {
+        input.addEventListener("input", () => {
+          healthTracker[input.dataset.health] = Number(input.value);
+          store.set("kj-health-tracker", healthTracker);
+          const done = [
+            Number(healthTracker.tennis) >= 1,
+            Number(healthTracker.golf) >= 1,
+            Number(healthTracker.sleep) >= 7
+          ].filter(Boolean).length;
+          document.querySelector("#healthRate").textContent = `${Math.round((done / 3) * 100)}%`;
+        });
+      });
+
+      modules.querySelectorAll("[data-module-title]").forEach(input => {
+        input.addEventListener("input", () => {
+          moduleData[active][Number(input.dataset.moduleTitle)].title = input.value;
+          store.set("kj-module-data", moduleData);
+        });
+      });
+
+      modules.querySelectorAll("[data-module-row-name]").forEach(input => {
+        input.addEventListener("input", () => {
+          const moduleIndex = Number(input.dataset.moduleRowName);
+          const rowIndex = Number(input.dataset.row);
+          moduleData[active][moduleIndex].rows[rowIndex][0] = input.value;
+          store.set("kj-module-data", moduleData);
+        });
+      });
+
+      modules.querySelectorAll("[data-module-row-value]").forEach(input => {
+        input.addEventListener("input", () => {
+          const moduleIndex = Number(input.dataset.moduleRowValue);
+          const rowIndex = Number(input.dataset.row);
+          moduleData[active][moduleIndex].rows[rowIndex][1] = input.value;
+          store.set("kj-module-data", moduleData);
+        });
+      });
+    }
+
+    function renderPriorities() {
+      priorityList.innerHTML = priorities.map((text, index) => `
+        <label class="priority">
+          <span class="rank">${index + 1}</span>
+          <input type="text" value="${escapeHtml(text)}" data-priority="${index}" />
+        </label>
+      `).join("");
+
+      priorityList.querySelectorAll("input").forEach(input => {
+        input.addEventListener("input", () => {
+          priorities[Number(input.dataset.priority)] = input.value;
+          store.set("kj-priorities", priorities);
+        });
+      });
+    }
+
+    function renderTasks() {
+      taskList.innerHTML = tasks.map((task, index) => `
+        <label class="check-item ${task.done ? "done" : ""}">
+          <input type="checkbox" ${task.done ? "checked" : ""} data-check="${index}" />
+          <span>${escapeHtml(task.text)}</span>
+          <button class="icon-btn" title="삭제" data-remove="${index}" type="button">×</button>
+        </label>
+      `).join("");
+
+      taskList.querySelectorAll("[data-check]").forEach(input => {
+        input.addEventListener("change", () => {
+          tasks[Number(input.dataset.check)].done = input.checked;
+          store.set("kj-tasks", tasks);
+          renderTasks();
+          updateMetrics();
+        });
+      });
+
+      taskList.querySelectorAll("[data-remove]").forEach(button => {
+        button.addEventListener("click", () => {
+          tasks.splice(Number(button.dataset.remove), 1);
+          store.set("kj-tasks", tasks);
+          renderTasks();
+          updateMetrics();
+        });
+      });
+    }
+
+    function renderMarket(target, rows) {
+      if (editMode && target === "#usMarket") {
+        document.querySelector(target).innerHTML = rows.map(([name, detail, change], index) => `
+          <div class="edit-grid">
+            <div class="edit-row">
+              <label class="field">
+                <span class="edit-label">종목/지수</span>
+                <input type="text" value="${escapeHtml(name)}" data-us-row="${index}" data-us-field="0" />
+              </label>
+              <label class="field">
+                <span class="edit-label">변동률</span>
+                <input type="text" value="${escapeHtml(change)}" data-us-row="${index}" data-us-field="2" />
+              </label>
+            </div>
+            <label class="field">
+              <span class="edit-label">설명</span>
+              <input type="text" value="${escapeHtml(detail)}" data-us-row="${index}" data-us-field="1" />
+            </label>
+          </div>
+        `).join("");
+
+        document.querySelectorAll("[data-us-row]").forEach(input => {
+          input.addEventListener("input", () => {
+            const rowIndex = Number(input.dataset.usRow);
+            const fieldIndex = Number(input.dataset.usField);
+            usMarket[rowIndex][fieldIndex] = input.value;
+            usMarket[rowIndex][3] = String(usMarket[rowIndex][2]).trim().startsWith("-") ? "down" : "up";
+            store.set("kj-us-market", usMarket);
+          });
+        });
+        return;
+      }
+
+      document.querySelector(target).innerHTML = rows.map(([name, detail, change, mode]) => `
+        <div class="ticker">
+          <div><b>${name}</b><small>${detail}</small></div>
+          <strong class="${mode}">${change}</strong>
+          <span class="tag ${mode === "up" ? "green" : "red"}">${mode === "up" ? "상승" : "하락"}</span>
+        </div>
+      `).join("");
+    }
+
+    function renderKoreanStocks() {
+      document.querySelector("#krMarket").innerHTML = koreanStocks.map((stock, index) => {
+        const purchase = Number(stock.purchase) || 0;
+        const current = Number(stock.current) || 0;
+        const profit = purchase > 0 ? ((current - purchase) / purchase) * 100 : 0;
+        const mode = profit >= 0 ? "up" : "down";
+        return `
+          <article class="stock-row">
+            <div class="stock-name">
+              <b>${stock.name}</b>
+              <small>${stock.symbol}</small>
+            </div>
+            <div class="stock-field">
+              <label>매수가</label>
+              <input type="number" min="0" step="100" value="${purchase}" data-stock="${index}" data-field="purchase" />
+            </div>
+            <div class="stock-field">
+              <label>현재가</label>
+              <input type="number" min="0" step="100" value="${current}" data-stock="${index}" data-field="current" />
+            </div>
+            <div class="profit-box ${mode}">${profit.toFixed(1)}%</div>
+            <textarea class="stock-notes" data-stock="${index}" data-field="notes" placeholder="투자 메모">${escapeHtml(stock.notes)}</textarea>
+          </article>
+        `;
+      }).join("");
+
+      document.querySelectorAll("[data-stock]").forEach(input => {
+        input.addEventListener("input", () => {
+          const index = Number(input.dataset.stock);
+          const field = input.dataset.field;
+          koreanStocks[index][field] = field === "notes" ? input.value : Number(input.value);
+          store.set("kj-korean-stocks", koreanStocks);
+          if (field !== "notes") {
+            const purchase = Number(koreanStocks[index].purchase) || 0;
+            const current = Number(koreanStocks[index].current) || 0;
+            const profit = purchase > 0 ? ((current - purchase) / purchase) * 100 : 0;
+            const profitBox = input.closest(".stock-row").querySelector(".profit-box");
+            profitBox.textContent = `${profit.toFixed(1)}%`;
+            profitBox.classList.toggle("up", profit >= 0);
+            profitBox.classList.toggle("down", profit < 0);
+          }
+        });
+      });
+    }
+
+    function renderRhythm() {
+      if (editMode) {
+        document.querySelector("#rhythm").innerHTML = rhythm.map(([name, value], index) => `
+          <div class="edit-row">
+            <label class="field">
+              <span class="edit-label">항목</span>
+              <input type="text" value="${escapeHtml(name)}" data-rhythm-row="${index}" data-rhythm-field="name" />
+            </label>
+            <label class="field">
+              <span class="edit-label">진행률</span>
+              <input type="number" min="0" max="100" step="1" value="${Number(value) || 0}" data-rhythm-row="${index}" data-rhythm-field="value" />
+            </label>
+          </div>
+        `).join("");
+
+        document.querySelectorAll("[data-rhythm-row]").forEach(input => {
+          input.addEventListener("input", () => {
+            const rowIndex = Number(input.dataset.rhythmRow);
+            if (input.dataset.rhythmField === "name") rhythm[rowIndex][0] = input.value;
+            if (input.dataset.rhythmField === "value") rhythm[rowIndex][1] = Number(input.value);
+            store.set("kj-rhythm", rhythm);
+          });
+        });
+        return;
+      }
+
+      document.querySelector("#rhythm").innerHTML = rhythm.map(([name, value]) => `
+        <div>
+          <div class="bar-label"><span>${name}</span><b>${value}%</b></div>
+          <div class="bar"><i style="width:${value}%"></i></div>
+        </div>
+      `).join("");
+    }
+
+    function updateMetrics() {
+      const done = tasks.filter(task => task.done).length;
+      const total = tasks.length || 1;
+      document.querySelector("#metricDone").textContent = done;
+      document.querySelector("#metricOpen").textContent = tasks.length - done;
+      document.querySelector("#completeRate").textContent = `완료율 ${Math.round(done / total * 100)}%`;
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;");
+    }
+
+    function formatWon(value) {
+      return new Intl.NumberFormat("ko-KR", {
+        style: "currency",
+        currency: "KRW",
+        maximumFractionDigits: 0
+      }).format(Number(value) || 0);
+    }
+
+    document.querySelector("#addTask").addEventListener("click", () => {
+      const input = document.querySelector("#newTask");
+      const text = input.value.trim();
+      if (!text) return;
+      tasks.push({ text, done: false });
+      input.value = "";
+      store.set("kj-tasks", tasks);
+      renderTasks();
+      updateMetrics();
+    });
+
+    document.querySelector("#newTask").addEventListener("keydown", event => {
+      if (event.key === "Enter") document.querySelector("#addTask").click();
+    });
+
+    document.querySelector("#clearDone").addEventListener("click", () => {
+      tasks = tasks.filter(task => !task.done);
+      store.set("kj-tasks", tasks);
+      renderTasks();
+      updateMetrics();
+    });
+
+    document.querySelector("#resetPriorities").addEventListener("click", () => {
+      priorities = [...defaultPriorities];
+      store.set("kj-priorities", priorities);
+      renderPriorities();
+    });
+
+    editModeToggle.addEventListener("click", () => {
+      editMode = !editMode;
+      store.set("kj-edit-mode", editMode);
+      renderAll();
+    });
+
+    function renderAll() {
+      renderNav();
+      renderModules();
+      renderPriorities();
+      renderTasks();
+      renderKoreanStocks();
+      renderMarket("#usMarket", usMarket);
+      renderRhythm();
+      updateMetrics();
+    }
+
+    renderAll();
+  </script>
+</body>
+</html>
