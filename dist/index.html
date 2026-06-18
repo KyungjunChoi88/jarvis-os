@@ -360,7 +360,7 @@
     }
 
     .event-item {
-      grid-template-columns: minmax(0, 1fr) auto;
+      grid-template-columns: minmax(0, 1fr) auto auto;
     }
 
     .event-main {
@@ -754,7 +754,7 @@
           <p class="sub">해야 할 일, 놓치면 안 되는 일정, 법인 핵심만 먼저 봅니다.</p>
         </div>
         <div class="status">
-          <span class="pill"><i class="pulse"></i>로컬 저장 활성화</span>
+          <span class="pill" id="syncStatus"><i class="pulse"></i>로컬 저장 모드</span>
           <span class="pill" id="completeRate">완료율 0%</span>
           <span class="pill">Coming Soon</span>
           <button class="ghost-btn" id="calendarButton" type="button">Google Calendar 연결</button>
@@ -952,6 +952,11 @@
     // TODO: Google Calendar Event Insert API
     // TODO: Google Calendar Event Read API
 
+    const SUPABASE_URL = "https://jeivbybmdogvlvcbonpv.supabase.co";
+    const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_5qkZalR79rBB2V1rZ_b9hA_k9FWLwQi";
+    const SUPABASE_REST_URL = `${SUPABASE_URL}/rest/v1`;
+    let supabaseReady = false;
+
     const store = {
       get(key, fallback) {
         try {
@@ -1015,8 +1020,179 @@
     const eventTitleInput = document.querySelector("#eventTitleInput");
     const eventDateInput = document.querySelector("#eventDateInput");
     const eventTimeInput = document.querySelector("#eventTimeInput");
+    const syncStatus = document.querySelector("#syncStatus");
 
     today.textContent = new Intl.DateTimeFormat("ko-KR", { dateStyle: "full" }).format(new Date());
+
+    function setSyncStatus(status) {
+      syncStatus.innerHTML = `<i class="pulse"></i>${status}`;
+    }
+
+    function shortErrorMessage(error) {
+      const detail = error?.details ? ` (${error.details})` : "";
+      const message = `${error?.message || String(error)}${detail}`;
+      return message.length > 56 ? `${message.slice(0, 56)}...` : message;
+    }
+
+    function logSupabaseConfig() {
+      console.info("[Supabase config check]", {
+        SUPABASE_URL,
+        SUPABASE_REST_URL,
+        SUPABASE_URL_has_rest_v1: SUPABASE_URL.includes("/rest/v1"),
+        SUPABASE_PUBLISHABLE_KEY,
+        publishableKeyMatchesExpected: SUPABASE_PUBLISHABLE_KEY === "sb_publishable_5qkZalR79rBB2V1rZ_b9hA_k9FWLwQi"
+      });
+    }
+
+    async function supabaseRequest(table, query = "", options = {}) {
+      const method = options.method || "GET";
+      const url = `${SUPABASE_REST_URL}/${table}${query}`;
+      let response;
+
+      try {
+        response = await fetch(url, {
+          ...options,
+          headers: {
+            apikey: SUPABASE_PUBLISHABLE_KEY,
+            Authorization: `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
+            "Content-Type": "application/json",
+            Prefer: "return=representation",
+            ...(options.headers || {})
+          }
+        });
+      } catch (error) {
+        console.error("[Supabase network request failed]", {
+          table,
+          method,
+          url,
+          SUPABASE_URL,
+          SUPABASE_PUBLISHABLE_KEY,
+          message: error?.message,
+          error
+        });
+        throw new Error(`${table} ${method} network failed: ${error?.message || error}`);
+      }
+
+      if (!response.ok) {
+        const responseBody = await response.text().catch(() => "");
+        let supabaseError = {};
+        try {
+          supabaseError = responseBody ? JSON.parse(responseBody) : {};
+        } catch {
+          supabaseError = { message: responseBody };
+        }
+        const message = supabaseError.message || `${table} ${method} failed: ${response.status} ${response.statusText}`;
+        const details = supabaseError.details || supabaseError.hint || responseBody;
+        console.error("[Supabase request failed]", {
+          table,
+          method,
+          url,
+          SUPABASE_URL,
+          SUPABASE_REST_URL,
+          SUPABASE_URL_has_rest_v1: SUPABASE_URL.includes("/rest/v1"),
+          SUPABASE_PUBLISHABLE_KEY,
+          status: response.status,
+          statusText: response.statusText,
+          responseBody,
+          supabaseError,
+          details,
+          requestBody: options.body || null,
+          message
+        });
+        const error = new Error(message);
+        error.details = details;
+        error.status = response.status;
+        error.table = table;
+        error.method = method;
+        error.responseBody = responseBody;
+        throw error;
+      }
+
+      if (response.status === 204) return null;
+      return response.json();
+    }
+
+    function syncFailed(error, context = "Supabase sync") {
+      console.error(`[${context} failed]`, {
+        message: error?.message,
+        details: error?.details,
+        SUPABASE_URL,
+        SUPABASE_REST_URL,
+        SUPABASE_URL_has_rest_v1: SUPABASE_URL.includes("/rest/v1"),
+        SUPABASE_PUBLISHABLE_KEY,
+        error
+      });
+      supabaseReady = false;
+      setSyncStatus(`동기화 실패: ${shortErrorMessage(error)}`);
+    }
+
+    function memoFromRow(row) {
+      return {
+        id: row.id,
+        text: row.text ?? row.content ?? row.title ?? "",
+        done: Boolean(row.done ?? row.completed ?? false),
+        createdAt: row.created_at ?? row.createdAt ?? new Date().toISOString()
+      };
+    }
+
+    function taskFromRow(row) {
+      return {
+        id: row.id,
+        text: row.text ?? row.content ?? row.title ?? "",
+        done: Boolean(row.done ?? row.completed ?? false),
+        createdAt: row.created_at ?? row.createdAt ?? new Date().toISOString()
+      };
+    }
+
+    function eventFromRow(row) {
+      return {
+        id: row.id,
+        title: row.title ?? "",
+        date: row.date ?? row.event_date ?? "",
+        time: row.time ?? row.event_time ?? "09:00",
+        createdAt: row.created_at ?? row.createdAt ?? new Date().toISOString()
+      };
+    }
+
+    function renderAll() {
+      renderMemos();
+      renderTasks();
+      renderEvents();
+      renderInvestments();
+      renderIssues();
+      updateSummary();
+    }
+
+    async function loadSupabaseData() {
+      try {
+        const [remoteMemos, remoteTasks, remoteEvents] = await Promise.all([
+          supabaseRequest("quick_memos", "?select=*&order=created_at.desc"),
+          supabaseRequest("daily_tasks", "?select=*&order=created_at.desc"),
+          supabaseRequest("calendar_events", "?select=*&order=date.asc,time.asc")
+        ]);
+
+        memos = Array.isArray(remoteMemos) ? remoteMemos.map(memoFromRow) : memos;
+        tasks = Array.isArray(remoteTasks) ? remoteTasks.map(taskFromRow) : tasks;
+        calendarEvents = Array.isArray(remoteEvents) ? remoteEvents.map(eventFromRow) : calendarEvents;
+        saveMemos();
+        saveTasks();
+        saveEvents();
+        supabaseReady = true;
+        setSyncStatus("Supabase 연결됨");
+        renderAll();
+      } catch (error) {
+        supabaseReady = false;
+        setSyncStatus(`로컬 저장 모드: ${shortErrorMessage(error)}`);
+        console.error("[Supabase initial load failed. Falling back to localStorage]", {
+          message: error?.message,
+          SUPABASE_URL,
+          SUPABASE_REST_URL,
+          SUPABASE_PUBLISHABLE_KEY,
+          error
+        });
+        renderAll();
+      }
+    }
 
     function escapeHtml(value) {
       return String(value)
@@ -1045,6 +1221,106 @@
 
     function saveEvents() {
       store.set("calendarEvents", calendarEvents);
+    }
+
+    async function createMemoRecord(memo) {
+      if (!supabaseReady) return memo;
+      try {
+        const rows = await supabaseRequest("quick_memos", "", {
+          method: "POST",
+          body: JSON.stringify({ text: memo.text, completed: memo.done })
+        });
+        return rows?.[0] ? memoFromRow(rows[0]) : memo;
+      } catch (error) {
+        console.error("[quick_memos insert failed]", { message: error?.message, details: error?.details, error });
+        syncFailed(error, "quick_memos insert");
+        return memo;
+      }
+    }
+
+    async function updateMemoRecord(memo) {
+      if (!supabaseReady || !memo?.id) return;
+      try {
+        await supabaseRequest("quick_memos", `?id=eq.${encodeURIComponent(memo.id)}`, {
+          method: "PATCH",
+          body: JSON.stringify({ text: memo.text, completed: memo.done })
+        });
+      } catch (error) {
+        syncFailed(error, "quick_memos update");
+      }
+    }
+
+    async function deleteMemoRecord(memo) {
+      if (!supabaseReady || !memo?.id) return;
+      try {
+        await supabaseRequest("quick_memos", `?id=eq.${encodeURIComponent(memo.id)}`, { method: "DELETE" });
+      } catch (error) {
+        syncFailed(error, "quick_memos delete");
+      }
+    }
+
+    async function createTaskRecord(task) {
+      if (!supabaseReady) return task;
+      try {
+        const rows = await supabaseRequest("daily_tasks", "", {
+          method: "POST",
+          body: JSON.stringify({ text: task.text, completed: task.done })
+        });
+        return rows?.[0] ? taskFromRow(rows[0]) : task;
+      } catch (error) {
+        console.error("[daily_tasks insert failed]", { message: error?.message, details: error?.details, error });
+        syncFailed(error, "daily_tasks insert");
+        return task;
+      }
+    }
+
+    async function updateTaskRecord(task) {
+      if (!supabaseReady || !task?.id) return;
+      try {
+        await supabaseRequest("daily_tasks", `?id=eq.${encodeURIComponent(task.id)}`, {
+          method: "PATCH",
+          body: JSON.stringify({ text: task.text, completed: task.done })
+        });
+      } catch (error) {
+        syncFailed(error, "daily_tasks update");
+      }
+    }
+
+    async function deleteTaskRecord(task) {
+      if (!supabaseReady || !task?.id) return;
+      try {
+        await supabaseRequest("daily_tasks", `?id=eq.${encodeURIComponent(task.id)}`, { method: "DELETE" });
+      } catch (error) {
+        syncFailed(error, "daily_tasks delete");
+      }
+    }
+
+    async function createEventRecord(calendarEvent) {
+      if (!supabaseReady) return calendarEvent;
+      try {
+        const rows = await supabaseRequest("calendar_events", "", {
+          method: "POST",
+          body: JSON.stringify({
+            title: calendarEvent.title,
+            date: calendarEvent.date,
+            time: calendarEvent.time
+          })
+        });
+        return rows?.[0] ? eventFromRow(rows[0]) : calendarEvent;
+      } catch (error) {
+        console.error("[calendar_events insert failed]", { message: error?.message, details: error?.details, error });
+        syncFailed(error, "calendar_events insert");
+        return calendarEvent;
+      }
+    }
+
+    async function deleteEventRecord(calendarEvent) {
+      if (!supabaseReady || !calendarEvent?.id) return;
+      try {
+        await supabaseRequest("calendar_events", `?id=eq.${encodeURIComponent(calendarEvent.id)}`, { method: "DELETE" });
+      } catch (error) {
+        syncFailed(error, "calendar_events delete");
+      }
     }
 
     function buildGoogleCalendarUrl(event) {
@@ -1092,11 +1368,13 @@
       `).join("");
 
       memoList.querySelectorAll("[data-memo-check]").forEach(input => {
-        input.addEventListener("change", () => {
-          memos[Number(input.dataset.memoCheck)].done = input.checked;
+        input.addEventListener("change", async () => {
+          const memo = memos[Number(input.dataset.memoCheck)];
+          memo.done = input.checked;
           saveMemos();
           renderMemos();
           updateSummary();
+          await updateMemoRecord(memo);
         });
       });
 
@@ -1105,20 +1383,27 @@
       });
 
       memoList.querySelectorAll("[data-memo-remove]").forEach(button => {
-        button.addEventListener("click", () => {
-          memos.splice(Number(button.dataset.memoRemove), 1);
+        button.addEventListener("click", async () => {
+          const [removedMemo] = memos.splice(Number(button.dataset.memoRemove), 1);
           saveMemos();
           renderMemos();
           updateSummary();
+          await deleteMemoRecord(removedMemo);
         });
       });
     }
 
-    function addMemo() {
+    async function addMemo() {
       const text = memoInput.value.trim();
       if (!text) return;
-      memos.unshift({ text, done: false, createdAt: new Date().toISOString() });
+      const memo = { text, done: false, createdAt: new Date().toISOString() };
+      memos.unshift(memo);
       memoInput.value = "";
+      saveMemos();
+      renderMemos();
+      updateSummary();
+      const savedMemo = await createMemoRecord(memo);
+      memos[0] = savedMemo;
       saveMemos();
       renderMemos();
       updateSummary();
@@ -1152,6 +1437,7 @@
               <span class="event-time">${escapeHtml(event.date)} ${escapeHtml(event.time)}</span>
             </div>
             <button class="google-calendar-btn" type="button" data-google-event="${escapeHtml(event.id)}">Google Calendar 등록</button>
+            <button class="icon-btn" type="button" title="삭제" data-event-remove="${escapeHtml(event.id)}">X</button>
           </article>
         `).join("")
         : `<article class="event-item"><span class="sub">빠른 메모에서 일정등록을 누르면 여기에 표시됩니다.</span></article>`;
@@ -1160,6 +1446,17 @@
 
       eventList.querySelectorAll("[data-google-event]").forEach(button => {
         button.addEventListener("click", () => openGoogleCalendarEvent(button.dataset.googleEvent));
+      });
+
+      eventList.querySelectorAll("[data-event-remove]").forEach(button => {
+        button.addEventListener("click", async () => {
+          const eventIndex = calendarEvents.findIndex(item => String(item.id) === String(button.dataset.eventRemove));
+          if (eventIndex < 0) return;
+          const [removedEvent] = calendarEvents.splice(eventIndex, 1);
+          saveEvents();
+          renderEvents();
+          await deleteEventRecord(removedEvent);
+        });
       });
     }
 
@@ -1173,29 +1470,38 @@
       `).join("");
 
       taskList.querySelectorAll("[data-task-check]").forEach(input => {
-        input.addEventListener("change", () => {
-          tasks[Number(input.dataset.taskCheck)].done = input.checked;
+        input.addEventListener("change", async () => {
+          const task = tasks[Number(input.dataset.taskCheck)];
+          task.done = input.checked;
           saveTasks();
           renderTasks();
           updateSummary();
+          await updateTaskRecord(task);
         });
       });
 
       taskList.querySelectorAll("[data-task-remove]").forEach(button => {
-        button.addEventListener("click", () => {
-          tasks.splice(Number(button.dataset.taskRemove), 1);
+        button.addEventListener("click", async () => {
+          const [removedTask] = tasks.splice(Number(button.dataset.taskRemove), 1);
           saveTasks();
           renderTasks();
           updateSummary();
+          await deleteTaskRecord(removedTask);
         });
       });
     }
 
-    function addTask() {
+    async function addTask() {
       const text = newTask.value.trim();
       if (!text) return;
-      tasks.push({ text, done: false });
+      const task = { text, done: false, createdAt: new Date().toISOString() };
+      tasks.push(task);
       newTask.value = "";
+      saveTasks();
+      renderTasks();
+      updateSummary();
+      const savedTask = await createTaskRecord(task);
+      tasks[tasks.length - 1] = savedTask;
       saveTasks();
       renderTasks();
       updateSummary();
@@ -1271,18 +1577,32 @@
       if (event.key === "Enter") addTask();
     });
 
-    document.querySelector("#clearDone").addEventListener("click", () => {
+    document.querySelector("#clearDone").addEventListener("click", async () => {
+      const removedTasks = tasks.filter(task => task.done);
       tasks = tasks.filter(task => !task.done);
       saveTasks();
       renderTasks();
       updateSummary();
+      await Promise.all(removedTasks.map(deleteTaskRecord));
     });
 
-    document.querySelector("#resetTasks").addEventListener("click", () => {
-      tasks = [...defaultTasks];
+    document.querySelector("#resetTasks").addEventListener("click", async () => {
+      const previousTasks = [...tasks];
+      tasks = defaultTasks.map(task => ({ ...task, createdAt: new Date().toISOString() }));
       saveTasks();
       renderTasks();
       updateSummary();
+      if (supabaseReady) {
+        await Promise.all(previousTasks.map(deleteTaskRecord));
+        const savedTasks = [];
+        for (const task of tasks) {
+          savedTasks.push(await createTaskRecord(task));
+        }
+        tasks = savedTasks;
+        saveTasks();
+        renderTasks();
+        updateSummary();
+      }
     });
 
     document.querySelector("#calendarButton").addEventListener("click", () => {
@@ -1295,7 +1615,7 @@
       if (event.target === eventModal) closeEventModal();
     });
 
-    eventForm.addEventListener("submit", event => {
+    eventForm.addEventListener("submit", async event => {
       event.preventDefault();
       const title = eventTitleInput.value.trim();
       const date = eventDateInput.value;
@@ -1303,10 +1623,15 @@
       if (!title || !date || !time) return;
 
       const maxId = calendarEvents.reduce((max, item) => Math.max(max, Number(item.id) || 0), 0);
-      calendarEvents.push({ id: maxId + 1, title, date, time });
+      const calendarEvent = { id: maxId + 1, title, date, time, createdAt: new Date().toISOString() };
+      calendarEvents.push(calendarEvent);
       saveEvents();
       renderEvents();
       closeEventModal();
+      const savedEvent = await createEventRecord(calendarEvent);
+      calendarEvents[calendarEvents.length - 1] = savedEvent;
+      saveEvents();
+      renderEvents();
     });
 
     document.addEventListener("keydown", event => {
@@ -1316,12 +1641,10 @@
       }
     });
 
-    renderMemos();
-    renderTasks();
-    renderEvents();
-    renderInvestments();
-    renderIssues();
-    updateSummary();
+    logSupabaseConfig();
+    setSyncStatus("로컬 저장 모드");
+    renderAll();
+    loadSupabaseData();
   </script>
 </body>
 </html>
