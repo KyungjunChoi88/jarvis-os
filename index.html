@@ -1135,16 +1135,58 @@
       return message.length > 56 ? `${message.slice(0, 56)}...` : message;
     }
 
-    function googleAuthUrl(path) {
-      return `${path}?${new URLSearchParams({ callbackUrl: window.location.pathname }).toString()}`;
+    async function nextAuthAction(action, provider) {
+      const callbackUrl = window.location.pathname || "/";
+      const csrfResponse = await fetch("/api/auth/csrf", { cache: "no-store" });
+      const { csrfToken } = await csrfResponse.json();
+      const endpoint = provider ? `/api/auth/${action}/${provider}` : `/api/auth/${action}`;
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+          csrfToken,
+          callbackUrl,
+          json: "true"
+        })
+      });
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data?.error || `Google Calendar ${action} 요청에 실패했습니다.`);
+      }
+
+      window.location.href = data.url || callbackUrl;
     }
 
-    function connectGoogleCalendar() {
-      window.location.href = googleAuthUrl("/api/auth/signin/google");
+    async function signIn(provider) {
+      await nextAuthAction("signin", provider);
     }
 
-    function disconnectGoogleCalendar() {
-      window.location.href = googleAuthUrl("/api/auth/signout");
+    async function signOut() {
+      await nextAuthAction("signout");
+    }
+
+    async function connectGoogleCalendar() {
+      setGoogleCalendarError("");
+      googleCalendarConnect.disabled = true;
+      document.querySelector("#calendarButton").disabled = true;
+      try {
+        await signIn("google");
+      } catch (error) {
+        googleCalendarConnect.disabled = false;
+        document.querySelector("#calendarButton").disabled = false;
+        setGoogleCalendarError(error?.message || "Google 로그인으로 이동하지 못했습니다.");
+      }
+    }
+
+    async function disconnectGoogleCalendar() {
+      googleCalendarDisconnect.disabled = true;
+      try {
+        await signOut();
+      } catch (error) {
+        googleCalendarDisconnect.disabled = false;
+        setGoogleCalendarError(error?.message || "로그아웃하지 못했습니다.");
+      }
     }
 
     function setGoogleCalendarError(message = "") {
