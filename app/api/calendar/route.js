@@ -1,6 +1,4 @@
-import { getServerSession } from "next-auth";
 import { getToken } from "next-auth/jwt";
-import { authOptions } from "../../../lib/auth.js";
 
 export const dynamic = "force-dynamic";
 
@@ -61,16 +59,11 @@ async function fetchEvents(accessToken, { timeMin, timeMax, maxResults = 10 }) {
 }
 
 export async function GET(request) {
-  const session = await getServerSession(authOptions);
   const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
   const accessToken = token?.accessToken;
 
-  if (!session) {
-    return Response.json({ error: "Google 로그인이 필요합니다." }, { status: 401 });
-  }
-
   if (!accessToken) {
-    return Response.json({ error: "Google Calendar 접근 권한을 다시 연결해 주세요." }, { status: 401 });
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {
