@@ -325,6 +325,13 @@
       margin-top: 4px;
     }
 
+    #calendarButton {
+      color: var(--ink);
+      background: var(--green);
+      border-color: transparent;
+      box-shadow: 0 10px 26px rgba(98, 211, 148, .16);
+    }
+
     .quick-memo-form {
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto;
@@ -496,6 +503,65 @@
     .calendar-note {
       color: var(--muted);
       font-size: 13px;
+    }
+
+    .calendar-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .calendar-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .calendar-item,
+    .calendar-empty,
+    .calendar-loading {
+      padding: 12px;
+      border: 1px solid rgba(255, 255, 255, .08);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, .035);
+    }
+
+    .calendar-item {
+      display: grid;
+      gap: 6px;
+    }
+
+    .calendar-item a {
+      color: var(--text);
+      text-decoration: none;
+    }
+
+    .calendar-item a:hover {
+      color: var(--blue);
+    }
+
+    .calendar-meta {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .calendar-error {
+      display: none;
+      margin-bottom: 12px;
+      color: var(--red);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .calendar-error.show {
+      display: block;
+    }
+
+    [aria-labelledby="googleTodayTitle"],
+    [aria-labelledby="googleUpcomingTitle"] {
+      order: -10;
     }
 
     .bottom-fold {
@@ -812,6 +878,23 @@
             </div>
           </section>
 
+          <section class="card" aria-labelledby="googleTodayTitle">
+            <div class="card-head">
+              <div class="card-title" id="googleTodayTitle"><span class="symbol">G</span>오늘 일정</div>
+              <span class="calendar-note" id="googleCalendarStatus">Google Calendar</span>
+            </div>
+            <div class="body">
+              <div class="calendar-actions" id="googleCalendarActions">
+                <button class="primary-btn" id="googleCalendarConnect" type="button">Google Calendar 연결하기</button>
+                <button class="ghost-btn" id="googleCalendarDisconnect" type="button" hidden>로그아웃</button>
+              </div>
+              <p class="calendar-error" id="googleCalendarError"></p>
+              <div class="calendar-list" id="todayGoogleEvents">
+                <article class="calendar-empty">Google Calendar 연결하기를 눌러 일정을 확인하세요.</article>
+              </div>
+            </div>
+          </section>
+
           <section class="card" aria-labelledby="eventTitle">
             <div class="card-head">
               <div class="card-title" id="eventTitle"><span class="symbol">D</span>예정 일정</div>
@@ -839,6 +922,18 @@
         </div>
 
         <aside class="stack">
+          <section class="card" aria-labelledby="googleUpcomingTitle">
+            <div class="card-head">
+              <div class="card-title" id="googleUpcomingTitle"><span class="symbol">U</span>다가오는 일정</div>
+              <span class="calendar-note">KST 기준</span>
+            </div>
+            <div class="body">
+              <div class="calendar-list" id="upcomingGoogleEvents">
+                <article class="calendar-empty">Google Calendar 연결 후 표시됩니다.</article>
+              </div>
+            </div>
+          </section>
+
           <section class="card" aria-labelledby="corpTitle">
             <div class="card-head">
               <div class="card-title" id="corpTitle"><span class="symbol">L</span>법인 핵심</div>
@@ -1021,6 +1116,12 @@
     const eventDateInput = document.querySelector("#eventDateInput");
     const eventTimeInput = document.querySelector("#eventTimeInput");
     const syncStatus = document.querySelector("#syncStatus");
+    const googleCalendarConnect = document.querySelector("#googleCalendarConnect");
+    const googleCalendarDisconnect = document.querySelector("#googleCalendarDisconnect");
+    const googleCalendarStatus = document.querySelector("#googleCalendarStatus");
+    const googleCalendarError = document.querySelector("#googleCalendarError");
+    const todayGoogleEvents = document.querySelector("#todayGoogleEvents");
+    const upcomingGoogleEvents = document.querySelector("#upcomingGoogleEvents");
 
     today.textContent = new Intl.DateTimeFormat("ko-KR", { dateStyle: "full" }).format(new Date());
 
@@ -1032,6 +1133,101 @@
       const detail = error?.details ? ` (${error.details})` : "";
       const message = `${error?.message || String(error)}${detail}`;
       return message.length > 56 ? `${message.slice(0, 56)}...` : message;
+    }
+
+    function googleAuthUrl(path) {
+      return `${path}?${new URLSearchParams({ callbackUrl: window.location.pathname }).toString()}`;
+    }
+
+    function connectGoogleCalendar() {
+      window.location.href = googleAuthUrl("/api/auth/signin/google");
+    }
+
+    function disconnectGoogleCalendar() {
+      window.location.href = googleAuthUrl("/api/auth/signout");
+    }
+
+    function setGoogleCalendarError(message = "") {
+      googleCalendarError.textContent = message;
+      googleCalendarError.classList.toggle("show", Boolean(message));
+    }
+
+    function formatGoogleEventTime(event) {
+      if (!event?.start) return "시간 정보 없음";
+      if (event.isAllDay) {
+        return new Intl.DateTimeFormat("ko-KR", {
+          timeZone: "Asia/Seoul",
+          month: "2-digit",
+          day: "2-digit"
+        }).format(new Date(`${event.start}T00:00:00+09:00`));
+      }
+
+      return new Intl.DateTimeFormat("ko-KR", {
+        timeZone: "Asia/Seoul",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit"
+      }).format(new Date(event.start));
+    }
+
+    function renderGoogleEvents(target, events, emptyText) {
+      target.innerHTML = events.length
+        ? events.map(event => {
+          const title = escapeHtml(event.title);
+          const location = event.location ? `<span class="calendar-meta">${escapeHtml(event.location)}</span>` : "";
+          const link = event.htmlLink
+            ? `<a href="${escapeHtml(event.htmlLink)}" target="_blank" rel="noopener noreferrer"><b>${title}</b></a>`
+            : `<b>${title}</b>`;
+
+          return `
+            <article class="calendar-item">
+              ${link}
+              <span class="calendar-meta">${escapeHtml(formatGoogleEventTime(event))}</span>
+              ${location}
+            </article>
+          `;
+        }).join("")
+        : `<article class="calendar-empty">${escapeHtml(emptyText)}</article>`;
+    }
+
+    async function loadGoogleCalendar() {
+      try {
+        googleCalendarStatus.textContent = "확인 중";
+        todayGoogleEvents.innerHTML = `<article class="calendar-loading">Google Calendar 상태를 확인하는 중입니다.</article>`;
+        upcomingGoogleEvents.innerHTML = `<article class="calendar-loading">일정을 불러오는 중입니다.</article>`;
+        setGoogleCalendarError("");
+
+        const sessionResponse = await fetch("/api/auth/session", { cache: "no-store" });
+        const session = await sessionResponse.json();
+        const signedIn = Boolean(session?.user);
+
+        googleCalendarConnect.hidden = signedIn;
+        googleCalendarDisconnect.hidden = !signedIn;
+
+        if (!signedIn) {
+          googleCalendarStatus.textContent = "연결 필요";
+          renderGoogleEvents(todayGoogleEvents, [], "Google Calendar 연결하기를 눌러 일정을 확인하세요.");
+          renderGoogleEvents(upcomingGoogleEvents, [], "Google Calendar 연결 후 표시됩니다.");
+          return;
+        }
+
+        googleCalendarStatus.textContent = "연결됨";
+        const calendarResponse = await fetch("/api/calendar", { cache: "no-store" });
+        const calendarData = await calendarResponse.json();
+
+        if (!calendarResponse.ok) {
+          throw new Error(calendarData?.error || "Google Calendar 일정을 불러오지 못했습니다.");
+        }
+
+        renderGoogleEvents(todayGoogleEvents, calendarData.today || [], "오늘 등록된 일정이 없습니다");
+        renderGoogleEvents(upcomingGoogleEvents, calendarData.upcoming || [], "다가오는 일정이 없습니다");
+      } catch (error) {
+        googleCalendarStatus.textContent = "오류";
+        setGoogleCalendarError(error?.message || "Google Calendar 연결 중 오류가 발생했습니다.");
+        renderGoogleEvents(todayGoogleEvents, [], "오늘 등록된 일정이 없습니다");
+        renderGoogleEvents(upcomingGoogleEvents, [], "다가오는 일정이 없습니다");
+      }
     }
 
     function logSupabaseConfig() {
@@ -1605,9 +1801,9 @@
       }
     });
 
-    document.querySelector("#calendarButton").addEventListener("click", () => {
-      alert("Google Calendar 연동 예정");
-    });
+    document.querySelector("#calendarButton").addEventListener("click", connectGoogleCalendar);
+    googleCalendarConnect.addEventListener("click", connectGoogleCalendar);
+    googleCalendarDisconnect.addEventListener("click", disconnectGoogleCalendar);
 
     document.querySelector("#closeEventModal").addEventListener("click", closeEventModal);
     document.querySelector("#cancelEvent").addEventListener("click", closeEventModal);
@@ -1644,6 +1840,7 @@
     logSupabaseConfig();
     setSyncStatus("로컬 저장 모드");
     renderAll();
+    loadGoogleCalendar();
     loadSupabaseData();
   </script>
 </body>
