@@ -7,7 +7,13 @@ export default function WfdPage(){
  const [i,setI]=useState(0),[playing,setPlaying]=useState(false),[phase,setPhase]=useState("대기");
  const audio=useRef(null),stop=useRef(false),timer=useRef(null),cancelResolve=useRef(null),koVoice=useRef(null); const item=WFD[i];
  const tabIndex=Math.floor(i/10), tab=TABS[tabIndex], tabStart=tab.start-1, tabEnd=tab.end-1;
- useEffect(()=>{\n  const loadVoices=()=>{const voices=window.speechSynthesis?.getVoices?.()||[];koVoice.current=voices.find(v=>v.lang?.toLowerCase()==="ko-kr")||voices.find(v=>v.lang?.toLowerCase().startsWith("ko"))||null};\n  loadVoices();\n  window.speechSynthesis?.addEventListener?.("voiceschanged",loadVoices);\n  return()=>{window.speechSynthesis?.removeEventListener?.("voiceschanged",loadVoices);halt()};\n },[]);\n function primeKorean(){if(!("speechSynthesis" in window))return;const s=window.speechSynthesis;s.cancel();s.resume();const u=new SpeechSynthesisUtterance("가");u.lang="ko-KR";u.volume=0;if(koVoice.current)u.voice=koVoice.current;s.speak(u);s.cancel();}
+ useEffect(()=>{
+  const loadVoices=()=>{const voices=window.speechSynthesis?.getVoices?.()||[];koVoice.current=voices.find(v=>v.lang?.toLowerCase()==="ko-kr")||voices.find(v=>v.lang?.toLowerCase().startsWith("ko"))||null};
+  loadVoices();
+  window.speechSynthesis?.addEventListener?.("voiceschanged",loadVoices);
+  return()=>{window.speechSynthesis?.removeEventListener?.("voiceschanged",loadVoices);halt()};
+ },[]);
+ function primeKorean(){if(!("speechSynthesis" in window))return;const s=window.speechSynthesis;s.cancel();s.resume();const u=new SpeechSynthesisUtterance("가");u.lang="ko-KR";u.volume=0;if(koVoice.current)u.voice=koVoice.current;s.speak(u);s.cancel();}
  function halt(){stop.current=true;setPlaying(false);setPhase("일시정지");if(timer.current)clearTimeout(timer.current);if(cancelResolve.current){cancelResolve.current();cancelResolve.current=null}window.speechSynthesis?.cancel();if(audio.current){audio.current.pause();audio.current.currentTime=0}}
  function wait(ms){return new Promise(r=>{cancelResolve.current=r;timer.current=setTimeout(()=>{cancelResolve.current=null;r()},ms)})}
  function english(src){return new Promise((r,j)=>{const a=audio.current;let done=false;const finish=()=>{if(done)return;done=true;cancelResolve.current=null;r()};cancelResolve.current=finish;a.src=src;a.currentTime=0;a.onended=finish;a.onerror=j;a.play().catch(j)})}
