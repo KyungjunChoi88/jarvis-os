@@ -55,9 +55,9 @@ function beginRecognition(){
  }catch(e){status('음성인식을 시작하지 못했습니다: '+e.message)}
 }
 function finishRead(){
- stopRecognition();showResult();paused=true;remaining=0;clearInterval(timer);timer=null;
- status(recognitionError?'분석 완료 (인식 오류: '+recognitionError+') · 다음 문제 버튼을 누르세요.':'분석 완료 · 결과를 확인하고 다음 문제 버튼을 누르세요.');
- controls();update();
+ const finishedIdx=idx;stopRecognition();paused=true;remaining=0;clearInterval(timer);timer=null;
+ status('음성인식 결과 정리 중…');controls();update();
+ setTimeout(()=>{if(idx!==finishedIdx)return;showResult();status(recognitionError?'분석 완료 (인식 오류: '+recognitionError+') · 다음 문제 버튼을 누르세요.':'분석 완료 · 결과를 확인하고 다음 문제 버튼을 누르세요.')},500);
 }
 function sample(){let a=[...ITEMS];for(let i=a.length-1;i>0;i--){let j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a.slice(0,7)}
 function controls(){const active=idx>=0&&idx<set.length;$('prev').disabled=idx<=0;$('next').disabled=!active;$('pause').disabled=!active||remaining===0;$('pause').textContent=paused?'계속':'일시정지'}
