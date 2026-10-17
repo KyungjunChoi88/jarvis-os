@@ -57,8 +57,8 @@ function beginRecording(){
  try{
   let mime=['audio/webm;codecs=opus','audio/webm','audio/mp4'].find(t=>MediaRecorder.isTypeSupported(t));
   let r=new MediaRecorder(stream,mime?{mimeType:mime}:undefined);recorder=r;
-  r.ondataavailable=e=>{if(e.data.size)recordChunks.push(e.data)};
-  r.onstop=()=>{if(recordChunks.length){recordUrl=URL.createObjectURL(new Blob(recordChunks,{type:r.mimeType||'audio/webm'}));recordUrls.push(recordUrl)}};
+  const chunks=[];r._chunks=chunks;
+  r.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
   r.start();
  }catch(e){console.warn('녹음 시작 실패',e)}
 }
@@ -66,8 +66,8 @@ function endRecording(result){
  let r=recorder;recorder=null;
  if(!r)return;
  r.onstop=()=>{
-  if(recordChunks.length){
-   let blob=new Blob(recordChunks,{type:r.mimeType||'audio/webm'});
+  if(r._chunks?.length){
+   let blob=new Blob(r._chunks,{type:r.mimeType||'audio/webm'});
    let url=URL.createObjectURL(blob);recordUrls.push(url);
    if(result)result.audioUrl=url;
    if($('summary')&&!$('summary').classList.contains('hidden'))showResults();
@@ -224,7 +224,7 @@ function showResults(){
  let root=$('results');root.replaceChildren();
  let heading=document.createElement('p');heading.textContent=results.length+'문제 · 인식된 단어 '+results.reduce((s,r)=>s+r.words,0)+'개';root.append(heading);
  for(let r of results){
-  let d=document.createElement('div');d.className='result',b=document.createElement('b');
+  let d=document.createElement('div'),b=document.createElement('b');d.className='result';
   b.textContent=(TYPES.find(t=>t[0]===r.item?.type)?.[1]||'DI 문제')+' · '+r.seconds+'초 · '+r.words+'단어';
   let p=document.createElement('p');p.className='transcript';p.textContent=r.text||'(인식된 음성 없음)';
   d.append(b,p);
