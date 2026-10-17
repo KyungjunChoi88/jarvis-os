@@ -10,7 +10,7 @@
 const TYPES=[['bar','Bar Chart'],['line','Line Chart'],['pie','Pie Chart'],['table','Table'],['map','Map'],['flow','Flow Chart'],['picture','Picture']];
 const $=id=>document.getElementById(id),SR=window.SpeechRecognition||window.webkitSpeechRecognition;
 if(window.pdfjsLib)pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-let db,docs={},pageStart={},queue=[],index=0,results=[],phase='idle',deadline=0,interval=null,recognition=null,recognizing=false,finalText='',interimText='',spoken=false,lastSpeech=0,lastVoice=0,session=0,audio=null,stream=null,paused=false,pausedPhase='',remainingMs=0,pausedSilenceMs=0,setRecorded=false,speechBlocked=false;
+let db,docs={},pageStart={},queue=[],index=0,results=[],phase='idle',deadline=0,interval=null,recognition=null,recognizing=false,finalText='',interimText='',spoken=false,lastSpeech=0,lastVoice=0,session=0,audio=null,stream=null,paused=false,pausedPhase='',remainingMs=0,pausedSilenceMs=0,setRecorded=false,speechBlocked=false,recorder=null,recordChunks=[],recordUrl=null,recordUrls=[];
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 function openDB(){return new Promise((res,rej)=>{let r=indexedDB.open('jarvis-di-v1',1);r.onupgradeneeded=()=>r.result.createObjectStore('pdf');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)})}
 function store(type,blob){return new Promise((res,rej)=>{let t=db.transaction('pdf','readwrite');t.objectStore('pdf').put(blob,type);t.oncomplete=res;t.onerror=()=>rej(t.error)})}
@@ -51,6 +51,30 @@ async function render(item){
 }
 function clearTimer(){if(interval){clearInterval(interval);interval=null}}
 function stopSpeech(){if(recognition){let r=recognition;recognition=null;try{r.onend=null;r.onresult=null;r.onerror=null;r.abort()}catch(e){}}recognizing=false}
+function beginRecording(){
+ recordChunks=[];recordUrl=null;
+ if(!stream||!window.MediaRecorder)return;
+ try{
+  let mime=['audio/webm;codecs=opus','audio/webm','audio/mp4'].find(t=>MediaRecorder.isTypeSupported(t));
+  let r=new MediaRecorder(stream,mime?{mimeType:mime}:undefined);recorder=r;
+  r.ondataavailable=e=>{if(e.data.size)recordChunks.push(e.data)};
+  r.onstop=()=>{if(recordChunks.length){recordUrl=URL.createObjectURL(new Blob(recordChunks,{type:r.mimeType||'audio/webm'}));recordUrls.push(recordUrl)}};
+  r.start();
+ }catch(e){console.warn('녹음 시작 실패',e)}
+}
+function endRecording(result){
+ let r=recorder;recorder=null;
+ if(!r)return;
+ r.onstop=()=>{
+  if(recordChunks.length){
+   let blob=new Blob(recordChunks,{type:r.mimeType||'audio/webm'});
+   let url=URL.createObjectURL(blob);recordUrls.push(url);
+   if(result)result.audioUrl=url;
+   if(phase==='idle'&&$('summary')&&!$('summary').classList.contains('hidden'))showResults();
+  }
+ };
+ try{if(r.state!=='inactive')r.stop()}catch(e){}
+}
 function transcript(){return (finalText+' '+interimText).trim()}
 function updateText(){$('transcript').textContent=transcript()||'말씀하신 영어 문장이 여기에 표시됩니다.'}
 function startSpeech(token,resume=false){
@@ -89,10 +113,32 @@ function startSpeech(token,resume=false){
 }
 async function showQuestion(){clearTimer();stopSpeech();if(index>=queue.length){finish();return}let token=++session,item=queue[index];phase='loading';$('setup').classList.add('hidden');$('summary').classList.add('hidden');$('practice').classList.remove('hidden');$('count').textContent=(index+1)+' / '+queue.length;$('kind').textContent=TYPES.find(t=>t[0]===item.type)[1]+' · #'+(item.page-(pageStart[item.type]||2)+1);$('phase').textContent='이미지 불러오는 중';$('transcript').textContent='';$('speechStatus').textContent='';try{await render(item)}catch(e){$('speechStatus').textContent='이미지 로드 실패: '+e.message;return}if(token!==session)return;phase='prepare';paused=false;$('pause').textContent='⏸ 일시정지';beep(1);$('phase').textContent='PREPARE · 이미지 분석';deadline=performance.now()+25000;tick();interval=setInterval(tick,100)}
 function tick(){let left=Math.max(0,(deadline-performance.now())/1000),duration=phase==='prepare'?25:40;$('timer').textContent=left.toFixed(1);$('fill').style.width=(100*left/duration)+'%';if(phase==='prepare'&&left<=0){beginSpeaking();return}if(phase==='speak'){if(spoken&&performance.now()-lastSpeech>=4000){complete();return}if(left<=0)complete()}}
-function beginSpeaking(){clearTimer();phase='speak';beep(2);$('phase').textContent='SPEAK · 최대 40초';$('speechStatus').textContent='말하기 시작 · 발화 후 4초 침묵 시 자동 종료';deadline=performance.now()+40000;let token=session;startSpeech(token);interval=setInterval(tick,100);tick()}
-function togglePause(){if(phase==='prepare'||phase==='speak'){pausedPhase=phase;remainingMs=Math.max(0,deadline-performance.now());pausedSilenceMs=spoken?Math.max(0,performance.now()-lastSpeech):0;clearTimer();stopSpeech();phase='paused';paused=true;$('phase').textContent='⏸ 일시정지 · '+(pausedPhase==='prepare'?'준비':'말하기');$('speechStatus').textContent='타이머와 음성인식이 일시정지되었습니다.';$('pause').textContent='▶ 계속하기';return}if(phase==='paused'){phase=pausedPhase;paused=false;deadline=performance.now()+remainingMs;if(phase==='speak'){if(spoken)lastSpeech=performance.now()-pausedSilenceMs;startSpeech(session,true)}$('phase').textContent=phase==='prepare'?'PREPARE · 이미지 분석':'SPEAK · 최대 40초';$('speechStatus').textContent=phase==='speak'?'음성인식 재개 · 4초 침묵 시 자동 종료':'';$('pause').textContent='⏸ 일시정지';interval=setInterval(tick,100);tick()}}
-function complete(){if(phase!=='speak'&&phase!=='prepare')return;let wasSpeaking=phase==='speak';phase='done';clearTimer();let words=transcript().trim().split(/\s+/).filter(Boolean);results.push({item:queue[index],text:transcript(),words:words.length,seconds:wasSpeaking?Math.round(40-Math.max(0,(deadline-performance.now())/1000)):0});stopSpeech();index++;showQuestion()}
-function finish(){let completed=index>=queue.length&&queue.length===5&&!setRecorded;if(completed){setRecorded=true;let key='jarvis-di-sets-'+todayKey();try{localStorage.setItem(key,String(Number(localStorage.getItem(key)||0)+1))}catch(e){}dailyUpdate()}clearTimer();stopSpeech();phase='idle';++session;$('practice').classList.add('hidden');$('summary').classList.remove('hidden');$('count').textContent='SET 완료';let root=$('results');root.replaceChildren();let heading=document.createElement('p');heading.textContent=results.length+'문제 · 인식된 단어 '+results.reduce((s,r)=>s+r.words,0)+'개';root.append(heading);for(let r of results){let d=document.createElement('div');d.className='result';let b=document.createElement('b');b.textContent=TYPES.find(t=>t[0]===r.item.type)[1]+' · '+r.seconds+'초 · '+r.words+'단어';let p=document.createElement('p');p.className='transcript';p.textContent=r.text||'(인식된 음성 없음)';d.append(b,p);root.append(d)}try{localStorage.setItem('jarvis-di-last',JSON.stringify({date:new Date().toISOString(),results}))}catch(e){}}
-async function start(){if(countPages()<5){alert('PDF 문제를 합계 5개 이상 등록하세요.');return}try{await prepareMic()}catch(e){alert(e.message);return}queue=makeQueue();index=0;results=[];setRecorded=false;showQuestion()}
+function beginSpeaking(){clearTimer();phase='speak';beginRecording();beep(2);$('phase').textContent='SPEAK · 최대 40초';$('speechStatus').textContent='말하기 시작 · 발화 후 4초 침묵 시 자동 종료';deadline=performance.now()+40000;let token=session;startSpeech(token);interval=setInterval(tick,100);tick()}
+function togglePause(){if(phase==='prepare'||phase==='speak'){pausedPhase=phase;remainingMs=Math.max(0,deadline-performance.now());pausedSilenceMs=spoken?Math.max(0,performance.now()-lastSpeech):0;clearTimer();stopSpeech();if(recorder&&recorder.state==='recording')recorder.pause();phase='paused';paused=true;$('phase').textContent='⏸ 일시정지 · '+(pausedPhase==='prepare'?'준비':'말하기');$('speechStatus').textContent='타이머와 음성인식이 일시정지되었습니다.';$('pause').textContent='▶ 계속하기';return}if(phase==='paused'){phase=pausedPhase;paused=false;deadline=performance.now()+remainingMs;if(phase==='speak'){if(spoken)lastSpeech=performance.now()-pausedSilenceMs;startSpeech(session,true);if(recorder&&recorder.state==='paused')recorder.resume()}$('phase').textContent=phase==='prepare'?'PREPARE · 이미지 분석':'SPEAK · 최대 40초';$('speechStatus').textContent=phase==='speak'?'음성인식 재개 · 4초 침묵 시 자동 종료':'';$('pause').textContent='⏸ 일시정지';interval=setInterval(tick,100);tick()}}
+function complete(){if(phase!=='speak'&&phase!=='prepare')return;let wasSpeaking=phase==='speak';phase='done';clearTimer();let words=transcript().trim().split(/\s+/).filter(Boolean);let result={item:queue[index],text:transcript(),words:words.length,seconds:wasSpeaking?Math.round(40-Math.max(0,(deadline-performance.now())/1000)):0};results.push(result);endRecording(result);stopSpeech();index++;showQuestion()}
+function showResults(){
+ let root=$('results');root.replaceChildren();
+ let heading=document.createElement('p');heading.textContent=results.length+'문제 · 인식된 단어 '+results.reduce((s,r)=>s+r.words,0)+'개';root.append(heading);
+ for(let r of results){
+  let d=document.createElement('div');d.className='result',b=document.createElement('b');
+  b.textContent=TYPES.find(t=>t[0]===r.item.type)[1]+' · '+r.seconds+'초 · '+r.words+'단어';
+  let p=document.createElement('p');p.className='transcript';p.textContent=r.text||'(인식된 음성 없음)';
+  d.append(b,p);
+  if(r.audioUrl){
+   let player=document.createElement('audio');player.controls=true;player.src=r.audioUrl;player.style.cssText='display:block;width:100%;max-width:480px;margin-top:10px';
+   d.append(player);
+  }
+  root.append(d);
+ }
+}
+function finish(){
+ let completed=index>=queue.length&&queue.length===5&&!setRecorded;
+ if(completed){setRecorded=true;let key='jarvis-di-sets-'+todayKey();try{localStorage.setItem(key,String(Number(localStorage.getItem(key)||0)+1))}catch(e){}dailyUpdate()}
+ clearTimer();endRecording(null);stopSpeech();phase='idle';++session;
+ $('practice').classList.add('hidden');$('summary').classList.remove('hidden');$('count').textContent='SET 완료';
+ showResults();
+ try{localStorage.setItem('jarvis-di-last',JSON.stringify({date:new Date().toISOString(),results:results.map(({audioUrl,...r})=>r)}))}catch(e){}
+}
+async function start(){if(countPages()<5){alert('PDF 문제를 합계 5개 이상 등록하세요.');return}try{await prepareMic()}catch(e){alert(e.message);return}recordUrls.forEach(u=>URL.revokeObjectURL(u));recordUrls=[];queue=makeQueue();index=0;results=[];setRecorded=false;showQuestion()}
 $('start').onclick=start;$('again').onclick=start;$('pause').onclick=togglePause;$('skip').onclick=()=>{if(phase==='prepare'||phase==='speak')complete()};$('stop').onclick=finish;window.addEventListener('beforeunload',()=>{stopSpeech();if(stream)stream.getTracks().forEach(t=>t.stop())});init();
 </script></body></html>
