@@ -66,12 +66,13 @@ function beep(count=1){
    const start=now+i*0.19;
    const osc=audioCtx.createOscillator(),gain=audioCtx.createGain();
    osc.type='sine';osc.frequency.value=count===1?660:880;
+   const duration=count===1?1:0.14;
    gain.gain.setValueAtTime(0,start);
    gain.gain.linearRampToValueAtTime(0.09,start+0.012);
-   gain.gain.setValueAtTime(0.09,start+0.105);
-   gain.gain.exponentialRampToValueAtTime(0.001,start+0.14);
+   gain.gain.setValueAtTime(0.09,start+duration-0.035);
+   gain.gain.exponentialRampToValueAtTime(0.001,start+duration);
    osc.connect(gain);gain.connect(audioCtx.destination);
-   osc.start(start);osc.stop(start+0.15);
+   osc.start(start);osc.stop(start+duration+0.01);
   }
  }catch(e){console.warn('알림음을 재생할 수 없습니다.',e)}
 }
