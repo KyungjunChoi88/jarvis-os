@@ -236,11 +236,23 @@ function showResults(){
  }
 }
 function finish(){
- let completed=index>=queue.length&&queue.length===5&&!setRecorded;
+ // Ending a SET early must retain the current speaking attempt and its recording.
+ const activeSpeaking=phase==='speak'||(phase==='paused'&&pausedPhase==='speak');
+ let currentResult=null;
+ if(activeSpeaking&&queue[index]){
+  const words=transcript().trim().split(/\s+/).filter(Boolean);
+  const remaining=phase==='paused'?remainingMs:Math.max(0,deadline-performance.now());
+  currentResult={item:queue[index],text:transcript(),words:words.length,seconds:Math.max(0,Math.round(40-remaining/1000))};
+  results.push(currentResult);
+ }
+ const completed=index>=queue.length&&queue.length===5&&!setRecorded;
  if(completed){setRecorded=true;let key='jarvis-di-sets-'+todayKey();try{localStorage.setItem(key,String(Number(localStorage.getItem(key)||0)+1))}catch(e){}dailyUpdate()}
- clearTimer();endRecording(null);stopSpeech();phase='idle';++session;
- $('practice').classList.add('hidden');$('summary').classList.remove('hidden');$('count').textContent='SET 완료';
+ clearTimer();stopSpeech();phase='idle';++session;
+ $('practice').classList.add('hidden');$('summary').classList.remove('hidden');
+ $('count').textContent=completed?'SET 완료':'연습 종료 · 결과';
  showResults();
+ // MediaRecorder.stop() is async. The callback attaches audio and redraws results.
+ endRecording(currentResult);
  try{localStorage.setItem('jarvis-di-last',JSON.stringify({date:new Date().toISOString(),results:results.map(({audioUrl,...r})=>r)}))}catch(e){}
 }
 async function start(){if(countPages()<5){alert('PDF 문제를 합계 5개 이상 등록하세요.');return}try{await prepareMic()}catch(e){alert(e.message);return}recordUrls.forEach(u=>URL.revokeObjectURL(u));recordUrls=[];queue=makeQueue();index=0;results=[];setRecorded=false;showQuestion()}
