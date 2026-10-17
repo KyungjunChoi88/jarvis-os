@@ -117,65 +117,108 @@ function beginSpeaking(){clearTimer();phase='speak';beginRecording();beep(2);$('
 function togglePause(){if(phase==='prepare'||phase==='speak'){pausedPhase=phase;remainingMs=Math.max(0,deadline-performance.now());pausedSilenceMs=spoken?Math.max(0,performance.now()-lastSpeech):0;clearTimer();stopSpeech();if(recorder&&recorder.state==='recording')recorder.pause();phase='paused';paused=true;$('phase').textContent='⏸ 일시정지 · '+(pausedPhase==='prepare'?'준비':'말하기');$('speechStatus').textContent='타이머와 음성인식이 일시정지되었습니다.';$('pause').textContent='▶ 계속하기';return}if(phase==='paused'){phase=pausedPhase;paused=false;deadline=performance.now()+remainingMs;if(phase==='speak'){if(spoken)lastSpeech=performance.now()-pausedSilenceMs;startSpeech(session,true);if(recorder&&recorder.state==='paused')recorder.resume()}$('phase').textContent=phase==='prepare'?'PREPARE · 이미지 분석':'SPEAK · 최대 40초';$('speechStatus').textContent=phase==='speak'?'음성인식 재개 · 4초 침묵 시 자동 종료':'';$('pause').textContent='⏸ 일시정지';interval=setInterval(tick,100);tick()}}
 function complete(){if(phase!=='speak'&&phase!=='prepare')return;let wasSpeaking=phase==='speak';phase='done';clearTimer();let words=transcript().trim().split(/\s+/).filter(Boolean);let result={item:queue[index],text:transcript(),words:words.length,seconds:wasSpeaking?Math.round(40-Math.max(0,(deadline-performance.now())/1000)):0};results.push(result);endRecording(result);stopSpeech();index++;showQuestion()}
 async function attachWaveform(player,url,host){
- const canvas=document.createElement('canvas');canvas.width=900;canvas.height=140;
- canvas.style.cssText='width:100%;height:140px;display:block;border-radius:10px;background:#101b30;cursor:pointer;margin-top:12px';
+ const canvas=document.createElement('canvas');canvas.width=1000;canvas.height=174;
+ canvas.style.cssText='width:100%;height:auto;display:block;border-radius:10px;background:#101b30;cursor:pointer;margin-top:12px';
  canvas.setAttribute('aria-label','녹음 파형: 클릭하면 해당 위치부터 재생');
- const note=document.createElement('div');note.className='muted';note.textContent='파형 분석 중...';
- host.append(canvas,note);
+ const stats=document.createElement('div');stats.className='muted';stats.style.cssText='margin-top:10px;font-size:14px';
+ const details=document.createElement('div');details.className='muted';details.style.cssText='margin-top:8px;line-height:1.8';
+ stats.textContent='녹음 분석 중...';host.append(canvas,stats,details);
+ const fmt=n=>Number(n).toFixed(1)+'초';
  try{
   const C=window.AudioContext||window.webkitAudioContext;
   if(!C)throw Error('오디오 분석 미지원');
   const ctx=new C();
-  const data=await(await fetch(url)).arrayBuffer();
-  const decoded=await ctx.decodeAudioData(data);
-  const samples=decoded.getChannelData(0),rate=decoded.sampleRate;
-  const bins=300,values=new Float32Array(bins);
-  for(let i=0;i<bins;i++){
-   const start=Math.floor(i*samples.length/bins),end=Math.floor((i+1)*samples.length/bins);
-   let sum=0,count=0;
-   const stride=Math.max(1,Math.floor((end-start)/250));
-   for(let j=start;j<end;j+=stride){sum+=samples[j]*samples[j];count++}
-   values[i]=Math.sqrt(sum/Math.max(1,count));
+  let decoded;
+  try{decoded=await ctx.decodeAudioData(await(await fetch(url)).arrayBuffer())}
+  finally{ctx.close().catch(()=>{})}
+  if(!canvas.isConnected)return;
+  const duration=decoded.duration,channels=Array.from({length:decoded.numberOfChannels},(_,i)=>decoded.getChannelData(i));
+  const rate=decoded.sampleRate;
+  // Analyze 20 ms RMS windows for a stable time scale (independent of canvas width).
+  const frameSeconds=.02,frameSamples=Math.max(1,Math.round(rate*frameSeconds));
+  const n=Math.ceil(decoded.length/frameSamples),levels=new Float32Array(n);
+  let peak=0;
+  for(let i=0;i<n;i++){
+   const begin=i*frameSamples,end=Math.min(decoded.length,begin+frameSamples);
+   let energy=0,count=0;
+   for(let j=begin;j<end;j++){
+    let v=0;for(const ch of channels)v+=ch[j];
+    v/=channels.length;energy+=v*v;count++;
+   }
+   const rms=Math.sqrt(energy/Math.max(1,count));levels[i]=rms;peak=Math.max(peak,rms);
   }
-  let peak=Math.max(...values,0.0001);
-  // A quiet section is a sustained low-energy interval, not a PTE fluency score.
-  const quiet=Array.from(values,v=>v<Math.max(.006,peak*.12));
-  const spans=[];let begin=-1;
-  for(let i=0;i<=bins;i++){
-   if(i<bins&&quiet[i]){if(begin<0)begin=i}
-   else if(begin>=0){
-    if((i-begin)*decoded.duration/bins>=.5)spans.push([begin,i]);
-    begin=-1;
+  // Relative threshold with an absolute noise floor. These are estimates, not a speech-recognition score.
+  const threshold=Math.max(.004,peak*.10);
+  const quiet=Array.from(levels,v=>v<threshold);
+  // Bridge brief consonant gaps (up to 0.12 s) to avoid false pause counts.
+  const bridge=Math.round(.12/frameSeconds);
+  let gap=-1;
+  for(let i=0;i<=n;i++){
+   if(i<n&&quiet[i]){if(gap<0)gap=i}
+   else if(gap>=0){
+    if(gap>0&&i<n&&i-gap<=bridge)quiet.fill(false,gap,i);
+    gap=-1;
    }
   }
+  const spans=[];let start=-1;
+  for(let i=0;i<=n;i++){
+   if(i<n&&quiet[i]){if(start<0)start=i}
+   else if(start>=0){
+    const from=start*frameSamples/rate,to=Math.min(duration,i*frameSamples/rate);
+    if(to-from>=.5)spans.push({from,to,length:to-from});
+    start=-1;
+   }
+  }
+  const quietTotal=spans.reduce((sum,p)=>sum+p.length,0);
+  const longest=spans.reduce((max,p)=>Math.max(max,p.length),0);
+  stats.textContent='전체 녹음 '+fmt(duration)+' · 긴 쉼 '+spans.length+'회 / 합계 '+fmt(quietTotal)+' · 가장 긴 쉼 '+fmt(longest);
+  details.textContent=spans.length
+   ? '쉼 구간 (시작–끝 / 길이): '+spans.map((p,i)=>(i+1)+'번 '+fmt(p.from)+'–'+fmt(p.to)+' / '+fmt(p.length)).join('  |  ')
+   : '0.5초 이상 조용한 구간이 감지되지 않았습니다.';
   const g=canvas.getContext('2d'),W=canvas.width,H=canvas.height;
+  const left=14,right=W-14,top=28,bottom=H-25,plotW=right-left,center=(top+bottom)/2;
+  const bins=330,values=new Float32Array(bins);
+  for(let i=0;i<bins;i++){
+   let a=Math.floor(i*n/bins),b=Math.min(n,Math.ceil((i+1)*n/bins));
+   for(let j=a;j<b;j++)values[i]=Math.max(values[i],levels[j]);
+  }
   function draw(){
    g.clearRect(0,0,W,H);g.fillStyle='#101b30';g.fillRect(0,0,W,H);
-   for(const [a,b] of spans){g.fillStyle='#6d3344';g.fillRect(a*W/bins,0,(b-a)*W/bins,H)}
-   g.strokeStyle='#263550';g.beginPath();g.moveTo(0,H/2);g.lineTo(W,H/2);g.stroke();
-   const step=W/bins;
-   for(let i=0;i<bins;i++){
-    const h=Math.max(1,Math.min(H*.46,values[i]/peak*H*.43));
-    g.fillStyle='#67e8a2';g.fillRect(i*step+1,H/2-h,Math.max(1,step-1),h*2);
+   for(const p of spans){
+    const x=left+p.from/duration*plotW,w=p.length/duration*plotW;
+    g.fillStyle='#783a48';g.fillRect(x,top,w,bottom-top);
+    if(w>=34){
+     g.font='bold 13px Arial';g.fillStyle='#fff';g.textAlign='center';
+     g.fillText(fmt(p.length),x+w/2,top+15);
+    }
    }
-   const x=Math.min(W,player.currentTime/Math.max(.01,player.duration||decoded.duration)*W);
-   g.fillStyle='rgba(255,255,255,.13)';g.fillRect(0,0,x,H);
-   g.strokeStyle='#fbbf24';g.lineWidth=3;g.beginPath();g.moveTo(x,0);g.lineTo(x,H);g.stroke();
+   g.strokeStyle='#31415b';g.lineWidth=1;g.beginPath();g.moveTo(left,center);g.lineTo(right,center);g.stroke();
+   const step=plotW/bins;
+   for(let i=0;i<bins;i++){
+    const h=Math.max(1,Math.min((bottom-top)*.46,values[i]/Math.max(.001,peak)*(bottom-top)*.43));
+    g.fillStyle='#67e8a2';g.fillRect(left+i*step,center-h,Math.max(1,step-0.8),h*2);
+   }
+   const progress=Math.max(0,Math.min(1,player.currentTime/Math.max(.01,duration)));
+   const x=left+progress*plotW;
+   g.fillStyle='rgba(255,255,255,.10)';g.fillRect(left,top,x-left,bottom-top);
+   g.strokeStyle='#fbbf24';g.lineWidth=3;g.beginPath();g.moveTo(x,top);g.lineTo(x,bottom);g.stroke();
+   g.font='13px Arial';g.fillStyle='#cbd5e1';g.textAlign='left';g.fillText('0.0초',left,H-7);
+   g.textAlign='right';g.fillText(fmt(duration),right,H-7);
   }
   canvas.addEventListener('click',e=>{
-   const r=canvas.getBoundingClientRect();
-   player.currentTime=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width))*player.duration;
+   const rect=canvas.getBoundingClientRect();
+   const x=(e.clientX-rect.left)/rect.width*W;
+   player.currentTime=Math.max(0,Math.min(1,(x-left)/plotW))*duration;
    draw();
   });
   let frame=0;
-  const animate=()=>{draw();if(!player.paused&&!player.ended)frame=requestAnimationFrame(animate)};
+  function animate(){draw();if(!player.paused&&!player.ended)frame=requestAnimationFrame(animate)}
   player.addEventListener('play',()=>{cancelAnimationFrame(frame);animate()});
   player.addEventListener('pause',()=>{cancelAnimationFrame(frame);draw()});
   player.addEventListener('seeked',draw);
   player.addEventListener('ended',()=>{cancelAnimationFrame(frame);draw()});
-  note.textContent='초록색: 목소리 크기 · 붉은 배경: 0.5초 이상 조용한 구간 ('+spans.length+'곳) · 노란 선: 현재 재생 위치';
-  draw();ctx.close().catch(()=>{});
- }catch(e){note.textContent='파형 분석을 지원하지 않는 녹음 형식입니다. 음성 재생은 가능합니다.';console.warn(e)}
+  draw();
+ }catch(e){stats.textContent='파형 분석에 실패했습니다. 녹음 재생은 가능합니다.';console.warn(e)}
 }
 function showResults(){
  let root=$('results');root.replaceChildren();
