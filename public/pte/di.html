@@ -290,7 +290,7 @@ function finish(){
   currentResult={item:queue[index],text:transcript(),words:words.length,seconds:Math.max(0,Math.round(40-remaining/1000))};
   currentResult.recordingPending=!!recorder;results.push(currentResult);
  }
- const completed=index>=queue.length&&queue.length===5&&!setRecorded;
+ const completed=index>=queue.length&&queue.length===(studyMode==='sequential'?2:5)&&!setRecorded;
  if(completed){setRecorded=true;if(studyMode==='random'){let key='jarvis-di-sets-'+todayKey();try{localStorage.setItem(key,String(Number(localStorage.getItem(key)||0)+1))}catch(e){}dailyUpdate()}}
  saveSequentialProgress();clearTimer();stopSpeech();phase='idle';++session;
  $('practice').classList.add('hidden');$('summary').classList.remove('hidden');
