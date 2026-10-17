@@ -3,7 +3,7 @@
 </style></head><body><main class="app"><nav><a href="/">JARVIS</a>　<a href="/pte/ra.html">RA 연습</a></nav><div class="top"><div class="title">PTE · DESCRIBE IMAGE</div><div id="count" class="muted">Ready</div></div>
 <section class="panel" id="setup"><div id="daily" class="daily">오늘 학습 기록 불러오는 중...</div><h2>DI 문제은행 · 7가지 유형</h2><p class="hint">GitHub 문제은행을 자동으로 불러옵니다. 최초 배포 전이나 문제가 없을 때만 아래에서 PDF를 직접 등록할 수 있습니다. 서버 문제은행은 예시 답안을 제외한 이미지로 구성됩니다.</p><div id="uploads" class="uploadgrid"></div><p id="bankStatus" class="muted"></p><button id="start">랜덤 5문제 시작</button><p class="hint">준비 25초 → 말하기 최대 40초 · 말하기 시작 후 4초 침묵하면 자동 종료 · 1 SET = 5문제</p></section>
 <section class="card hidden" id="practice"><div class="meta"><div><div id="kind" class="muted"></div><div id="phase" class="phase">PREPARE</div></div><div id="timer" class="timer">25.0</div></div><div class="bar"><div id="fill" class="fill"></div></div><div class="pausebar"><button id="pause">⏸ 일시정지</button><button id="speakNow" style="background:#67e8a2;color:#0b1020">🎤 바로 녹음 시작 →</button></div><div id="imagewrap" class="imagewrap"><canvas id="image"></canvas></div><div id="speechStatus" class="muted"></div><div class="panel"><b>🎤 실시간 받아쓰기</b><div id="transcript" class="transcript"></div></div><div class="controls"><button class="alt" id="skip">다음 문제 →</button><button class="alt" id="stop">SET 종료</button></div></section>
-<section class="panel hidden" id="summary"><h2>SET 연습 결과</h2><div id="results"></div><button id="again">다음 SET 시작</button></section>
+<section class="panel hidden" id="summary"><h2>SET 연습 결과 <small style="font-size:12px;color:#aab5ca">v20261017-2</small></h2><div id="results"></div><button id="again">다음 SET 시작</button></section>
 <p class="hint">Chrome/Edge 권장 · 음성인식은 브라우저 서비스에서 처리될 수 있으며 공식 PTE 점수가 아닙니다. GitHub에 등록된 문제은행은 모든 기기에서 동일하게 제공됩니다. 학습 결과는 현재 브라우저에만 저장됩니다. 마이크 사용을 허용해 주세요.</p></main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script><script>
 'use strict';
@@ -69,7 +69,7 @@ function endRecording(result){
   if(r._chunks?.length){
    let blob=new Blob(r._chunks,{type:r.mimeType||'audio/webm'});
    let url=URL.createObjectURL(blob);recordUrls.push(url);
-   if(result)result.audioUrl=url;
+   if(result){result.audioUrl=url;result.recordingPending=false;}
    if($('summary')&&!$('summary').classList.contains('hidden'))showResults();
   }
  };
@@ -115,7 +115,7 @@ async function showQuestion(){clearTimer();stopSpeech();if(index>=queue.length){
 function tick(){let left=Math.max(0,(deadline-performance.now())/1000),duration=phase==='prepare'?25:40;$('timer').textContent=left.toFixed(1);$('fill').style.width=(100*left/duration)+'%';if(phase==='prepare'&&left<=0){beginSpeaking();return}if(phase==='speak'){if(spoken&&performance.now()-lastSpeech>=4000){complete();return}if(left<=0)complete()}}
 function beginSpeaking(){if(phase!=='prepare')return;clearTimer();$('speakNow').classList.add('hidden');phase='speak';beginRecording();beep(2);$('phase').textContent='SPEAK · 최대 40초';$('speechStatus').textContent='말하기 시작 · 발화 후 4초 침묵 시 자동 종료';deadline=performance.now()+40000;let token=session;startSpeech(token);interval=setInterval(tick,100);tick()}
 function togglePause(){if(phase==='prepare'||phase==='speak'){pausedPhase=phase;remainingMs=Math.max(0,deadline-performance.now());pausedSilenceMs=spoken?Math.max(0,performance.now()-lastSpeech):0;clearTimer();stopSpeech();if(recorder&&recorder.state==='recording')recorder.pause();phase='paused';paused=true;$('speakNow').classList.add('hidden');$('phase').textContent='⏸ 일시정지 · '+(pausedPhase==='prepare'?'준비':'말하기');$('speechStatus').textContent='타이머와 음성인식이 일시정지되었습니다.';$('pause').textContent='▶ 계속하기';return}if(phase==='paused'){phase=pausedPhase;paused=false;if(phase==='prepare')$('speakNow').classList.remove('hidden');deadline=performance.now()+remainingMs;if(phase==='speak'){if(spoken)lastSpeech=performance.now()-pausedSilenceMs;startSpeech(session,true);if(recorder&&recorder.state==='paused')recorder.resume()}$('phase').textContent=phase==='prepare'?'PREPARE · 이미지 분석':'SPEAK · 최대 40초';$('speechStatus').textContent=phase==='speak'?'음성인식 재개 · 4초 침묵 시 자동 종료':'';$('pause').textContent='⏸ 일시정지';interval=setInterval(tick,100);tick()}}
-function complete(){if(phase!=='speak'&&phase!=='prepare')return;let wasSpeaking=phase==='speak';phase='done';clearTimer();let words=transcript().trim().split(/\s+/).filter(Boolean);let result={item:queue[index],text:transcript(),words:words.length,seconds:wasSpeaking?Math.round(40-Math.max(0,(deadline-performance.now())/1000)):0};results.push(result);endRecording(result);stopSpeech();index++;showQuestion()}
+function complete(){if(phase!=='speak'&&phase!=='prepare')return;let wasSpeaking=phase==='speak';phase='done';clearTimer();let words=transcript().trim().split(/\s+/).filter(Boolean);let result={item:queue[index],text:transcript(),words:words.length,seconds:wasSpeaking?Math.round(40-Math.max(0,(deadline-performance.now())/1000)):0};result.recordingPending=!!recorder;results.push(result);endRecording(result);stopSpeech();index++;showQuestion()}
 async function attachWaveform(player,url,host){
  const canvas=document.createElement('canvas');canvas.width=1000;canvas.height=174;
  canvas.style.cssText='width:100%;height:auto;display:block;border-radius:10px;background:#101b30;cursor:pointer;margin-top:12px';
@@ -221,19 +221,39 @@ async function attachWaveform(player,url,host){
  }catch(e){stats.textContent='파형 분석에 실패했습니다. 녹음 재생은 가능합니다.';console.warn(e)}
 }
 function showResults(){
- let root=$('results');root.replaceChildren();
- let heading=document.createElement('p');heading.textContent=results.length+'문제 · 인식된 단어 '+results.reduce((s,r)=>s+r.words,0)+'개';root.append(heading);
- for(let r of results){
-  let d=document.createElement('div'),b=document.createElement('b');d.className='result';
-  b.textContent=(TYPES.find(t=>t[0]===r.item?.type)?.[1]||'DI 문제')+' · '+r.seconds+'초 · '+r.words+'단어';
-  let p=document.createElement('p');p.className='transcript';p.textContent=r.text||'(인식된 음성 없음)';
-  d.append(b,p);
-  if(r.audioUrl){
-   let player=document.createElement('audio');player.controls=true;player.src=r.audioUrl;player.style.cssText='display:block;width:100%;max-width:480px;margin-top:10px';
-   d.append(player);attachWaveform(player,r.audioUrl,d);
+ const root=$('results');root.replaceChildren();
+ const heading=document.createElement('p');
+ heading.textContent=results.length+'문제 · 인식된 단어 '+results.reduce((sum,r)=>sum+(Number(r.words)||0),0)+'개';
+ root.appendChild(heading);
+ if(!results.length){const msg=document.createElement('p');msg.textContent='아직 완료한 문제가 없습니다. SPEAK에서 말한 뒤 종료해 주세요.';root.appendChild(msg);return}
+ results.forEach((r,i)=>{
+  const card=document.createElement('div');card.className='result';
+  try{
+   const title=document.createElement('b');
+   const type=TYPES.find(t=>t[0]===(r.item&&r.item.type));
+   title.textContent=(i+1)+'번 · '+(type?type[1]:'DI 문제')+' · '+(Number(r.seconds)||0)+'초 · '+(Number(r.words)||0)+'단어';
+   const transcriptNode=document.createElement('p');
+   transcriptNode.className='transcript';
+   transcriptNode.textContent=r.text||'(인식된 음성 없음)';
+   card.appendChild(title);card.appendChild(transcriptNode);
+   if(r.audioUrl){
+    const player=document.createElement('audio');
+    player.controls=true;player.preload='metadata';player.src=r.audioUrl;
+    player.style.cssText='display:block;width:100%;max-width:480px;margin-top:10px';
+    card.appendChild(player);
+    root.appendChild(card);
+    attachWaveform(player,r.audioUrl,card).catch(e=>console.error('파형 표시 실패',e));
+   }else{
+    const status=document.createElement('p');status.className='warning';
+    status.textContent=r.recordingPending?'녹음 파일 처리 중...':'녹음 파일 없음 · 브라우저 녹음 지원 또는 마이크 권한을 확인해 주세요.';
+    card.appendChild(status);root.appendChild(card);
+   }
+  }catch(e){
+   console.error('DI 결과 '+(i+1)+' 표시 오류',e);
+   card.textContent=(i+1)+'번 결과 표시 오류: '+e.message;
+   root.appendChild(card);
   }
-  root.append(d);
- }
+ });
 }
 function finish(){
  // Ending a SET early must retain the current speaking attempt and its recording.
@@ -243,7 +263,7 @@ function finish(){
   const words=transcript().trim().split(/\s+/).filter(Boolean);
   const remaining=phase==='paused'?remainingMs:Math.max(0,deadline-performance.now());
   currentResult={item:queue[index],text:transcript(),words:words.length,seconds:Math.max(0,Math.round(40-remaining/1000))};
-  results.push(currentResult);
+  currentResult.recordingPending=!!recorder;results.push(currentResult);
  }
  const completed=index>=queue.length&&queue.length===5&&!setRecorded;
  if(completed){setRecorded=true;let key='jarvis-di-sets-'+todayKey();try{localStorage.setItem(key,String(Number(localStorage.getItem(key)||0)+1))}catch(e){}dailyUpdate()}
