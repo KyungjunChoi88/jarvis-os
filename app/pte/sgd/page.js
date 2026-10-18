@@ -1,17 +1,17 @@
 "use client";
 import {useEffect,useRef,useState} from "react";
 const sentences=[
-  "The following discussion mainly talks about the important topic of Topic.",
-  "This topic is very common today, and many people agree that it has a strong impact on modern life.",
-  "Firstly, the audio talks about Keyword One.",
-  "The discussion provides simple ideas and clear points to help us understand why Keyword Two is important.",
-  "Next, the discussion talks about Keyword Three in more detail.",
-  "It is clear from the conversation that Keyword Four is an important part of this topic.",
-  "In addition, the audio mentions Keyword Five.",
-  "It suggests that Keyword Six may have an important role in future situations.",
-  "Finally, the ideas in the discussion were clear and easy to follow.",
+  "The following discussion mainly talks about the important topic of [땡땡].",
+  "This topic is very common today and many people agree that it has a strong impact on modern life.",
+  "Firstly the audio explains about [땡땡].",
+  "The discussion provides simple ideas and clear points to help us understand why [땡땡].",
+  "Next the discussion talks about [땡땡] in more detail.",
+  "It is clear from the conversation that [땡땡] is an important part of this topic.",
+  "In addition the audio mentions [땡땡].",
+  "It suggests that [땡땡] may have an important role in future situations.",
+  "Finally the ideas in the discussion explained clear and easy to follow.",
   "It gave some details and key points to support the main discussion.",
-  "In conclusion, the discussion gives a good explanation of Topic."
+  "In conclusion the discussion gives a good explanation of [땡땡]."
 ];
 const DB="jarvis-pte-sgd", STORE="audio";
 function openDB(){return new Promise((resolve,reject)=>{const r=indexedDB.open(DB,1);r.onupgradeneeded=()=>{if(!r.result.objectStoreNames.contains(STORE))r.result.createObjectStore(STORE)};r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)})}
