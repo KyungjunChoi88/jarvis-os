@@ -1,0 +1,1 @@
+import Checklist from "./Checklist"; export const dynamic="force-dynamic"; export default function Page(){return <Checklist/>}
