@@ -21,25 +21,110 @@ const essayParagraphs=[
 ];
 const essayLines=essayParagraphs.flatMap(p=>p.match(/[^.!?]+[.!?]+(?:\s|$)/g)?.map(s=>s.trim())||[p]);
 function EssayPractice(){
+ const labels=["서론","본론 1 · 장점","본론 2 · 단점","결론"];
+ const storageKey="jarvis-essay-paragraph-bounds-v1";
+ const essayAudio=useRef(null),boundRef=useRef(null),selectedRef=useRef(0),repeatRef=useRef(true),manualRef=useRef(false);
  const [index,setIndex]=useState(0),[hidden,setHidden]=useState(false),[showAll,setShowAll]=useState(false);
- const essayAudio=useRef(null),[audioSpeed,setAudioSpeed]=useState(1),[audioRepeat,setAudioRepeat]=useState(true);
+ const [audioSpeed,setAudioSpeed]=useState(1),[audioRepeat,setAudioRepeat]=useState(true),[bounds,setBounds]=useState(null),[duration,setDuration]=useState(0),[error,setError]=useState(""),[boundaryNote,setBoundaryNote]=useState("문단 경계를 준비하고 있습니다.");
+ const buttonStyle={border:"1px solid #354355",borderRadius:9,background:"#1d2530",color:"#eef3f8",padding:"10px 14px",minHeight:44,cursor:"pointer",font:"inherit"};
+ const rowStyle={display:"flex",gap:10,flexWrap:"wrap",alignItems:"center",marginBottom:14};
+ function publishBounds(next){boundRef.current=next;setBounds(next)}
+ function defaultBounds(total){const weights=essayParagraphs.map(p=>p.split(/\s+/).length),sum=weights.reduce((a,b)=>a+b,0);let elapsed=0;return [0,...weights.map(w=>elapsed+=total*w/sum)].map((v,i)=>i===4?total:v)}
+ function validBounds(value,total){return Array.isArray(value)&&value.length===5&&value.every((n,i)=>Number.isFinite(n)&&n>=0&&n<=total+.1&&(i===0||n>value[i-1]))&&value[0]===0&&Math.abs(value[4]-total)<1}
+ function loadBounds(total){
+  setDuration(total);
+  try{const saved=JSON.parse(localStorage.getItem(storageKey));if(validBounds(saved,total)){manualRef.current=true;publishBounds(saved);setBoundaryNote("이 브라우저에 저장한 문단 경계입니다.");return}}catch{}
+  if(!boundRef.current)publishBounds(defaultBounds(total));
+ }
+ useEffect(()=>{
+  let cancelled=false,context;
+  async function locatePauses(){
+   try{
+    const AudioContextClass=window.AudioContext||window.webkitAudioContext;
+    if(!AudioContextClass)return;
+    context=new AudioContextClass();
+    const response=await fetch("/pte/essay.mp3");if(!response.ok)throw new Error("audio");
+    const decoded=await context.decodeAudioData(await response.arrayBuffer());
+    const samples=decoded.getChannelData(0),step=Math.max(1,Math.floor(decoded.sampleRate*.02)),energies=[];
+    for(let at=0;at<samples.length;at+=step){let sum=0,count=Math.min(step,samples.length-at);for(let j=0;j<count;j++)sum+=samples[at+j]*samples[at+j];energies.push(Math.sqrt(sum/count))}
+    const average=energies.reduce((a,b)=>a+b,0)/energies.length,threshold=Math.max(.001,average*.12),pauses=[];
+    let start=-1;
+    for(let i=0;i<=energies.length;i++){
+     if(i<energies.length&&energies[i]<threshold){if(start<0)start=i}
+     else if(start>=0){if((i-start)*.02>=.28)pauses.push({time:(start+i)*.01,length:(i-start)*.02});start=-1}
+    }
+    const next=defaultBounds(decoded.duration);
+    for(let i=1;i<4;i++){
+     const candidates=pauses.filter(p=>Math.abs(p.time-next[i])<=5&&p.time>next[i-1]+3&&p.time<next[i+1]-3);
+     candidates.sort((a,b)=>(Math.abs(a.time-next[i])-.4*Math.min(a.length,2))-(Math.abs(b.time-next[i])-.4*Math.min(b.length,2)));
+     if(candidates.length)next[i]=candidates[0].time;
+    }
+    if(!cancelled&&!manualRef.current){publishBounds(next);setBoundaryNote("문단 경계는 녹음의 쉼과 글 길이로 자동 추정했습니다. 듣고 필요하면 아래에서 조정하세요.")}
+   }catch{if(!cancelled&&!manualRef.current)setBoundaryNote("문단 경계는 글 길이로 자동 추정했습니다. 듣고 필요하면 아래에서 조정하세요.")}
+   finally{if(context&&context.state!=="closed")context.close().catch(()=>{})}
+  }
+  locatePauses();return()=>{cancelled=true};
+ },[]);
+ function chooseParagraph(next){
+  const player=essayAudio.current;player?.pause();
+  selectedRef.current=next;setIndex(next);setHidden(false);setError("");
+  if(player&&boundRef.current)player.currentTime=boundRef.current[next];
+ }
+ async function playParagraph(){
+  const player=essayAudio.current,b=boundRef.current,i=selectedRef.current;
+  if(!player||!b)return;
+  try{player.currentTime=b[i];await player.play();setError("")}catch{setError("재생 버튼을 다시 눌러 주세요.")}
+ }
+ function handleTime(event){
+  const player=event.currentTarget,b=boundRef.current,i=selectedRef.current;
+  if(!b||player.paused)return;
+  if(player.currentTime<b[i]-.15){player.currentTime=b[i];return}
+  if(player.currentTime>=b[i+1]-.05){
+   if(repeatRef.current)player.currentTime=b[i];
+   else{player.pause();player.currentTime=b[i+1]}
+  }
+ }
+ function changeBoundary(which,value){
+  const b=[...boundRef.current],at=which==="start"?index:index+1,n=Number(value);
+  if(!Number.isFinite(n)||at===0||at===4)return;
+  b[at]=Math.max(b[at-1]+.25,Math.min(b[at+1]-.25,n));
+  manualRef.current=true;publishBounds(b);essayAudio.current?.pause();
+  setBoundaryNote("조정한 문단 경계를 이 브라우저에 저장했습니다.");
+  try{localStorage.setItem(storageKey,JSON.stringify(b))}catch{setBoundaryNote("문단 경계를 조정했습니다. 브라우저 저장은 사용할 수 없습니다.")}
+ }
+ function resetBoundaries(){
+  manualRef.current=false;try{localStorage.removeItem(storageKey)}catch{}
+  if(duration)publishBounds(defaultBounds(duration));
+  essayAudio.current?.pause();setBoundaryNote("글 길이 기준으로 초기화했습니다. 필요하면 다시 조정하세요.");
+ }
+ const formatTime=n=>String(Math.floor(n/60)).padStart(2,"0")+":"+String(Math.floor(n%60)).padStart(2,"0");
  return <section id="essay-template" style={{border:"1px solid #2b3645",borderRadius:14,background:"#171d26",padding:24,marginBottom:16}}>
-  <h2 style={{marginTop:0}}>Essay · 에세이 템플릿 암기</h2>
-  <p style={{color:"#9aa7b8",lineHeight:1.6}}>보내주신 원문입니다. 00 자리에 주제와 예시를 넣어 연습하세요.</p>
-  <audio ref={essayAudio} controls loop={audioRepeat} preload="metadata" src="/pte/essay.mp3" aria-label="에세이 원문 녹음" style={{width:"100%",marginBottom:12}}/>
-  <div style={{display:"flex",gap:10,flexWrap:"wrap",alignItems:"center",marginBottom:16}}>
-   <label>녹음 재생 속도 <select aria-label="에세이 녹음 재생 속도" value={audioSpeed} onChange={e=>{const value=Number(e.target.value);setAudioSpeed(value);if(essayAudio.current)essayAudio.current.playbackRate=value}}>{[.7,.8,.9,1,1.1,1.2].map(s=><option key={s} value={s}>{s.toFixed(1)}×</option>)}</select></label>
-   <label><input type="checkbox" checked={audioRepeat} onChange={e=>setAudioRepeat(e.target.checked)}/> 녹음 반복</label>
+  <h2 style={{marginTop:0}}>Essay · 4문단 암기</h2>
+  <p style={{color:"#9aa7b8",lineHeight:1.6}}>문단을 선택하고 해당 구간을 반복해서 연습하세요. 00 자리에 주제와 예시를 넣으면 됩니다.</p>
+  <div role="group" aria-label="에세이 문단 선택" style={rowStyle}>{labels.map((label,i)=><button type="button" key={label} aria-pressed={index===i} onClick={()=>chooseParagraph(i)} style={{...buttonStyle,background:index===i?"#6ea8ff":"#1d2530",color:index===i?"#10151d":"#eef3f8"}}>{i+1}. {label}</button>)}</div>
+  <audio ref={essayAudio} controls preload="metadata" src="/pte/essay.mp3" aria-label="에세이 원문 녹음" onLoadedMetadata={e=>loadBounds(e.currentTarget.duration)} onTimeUpdate={handleTime} onEnded={()=>{if(repeatRef.current)playParagraph()}} style={{width:"100%",marginBottom:12}}/>
+  <div style={rowStyle}>
+   <button type="button" style={buttonStyle} disabled={!bounds} onClick={playParagraph}>▶ 선택 문단 처음부터</button>
+   <label>재생 속도 <select aria-label="에세이 녹음 재생 속도" value={audioSpeed} onChange={e=>{const value=Number(e.target.value);setAudioSpeed(value);if(essayAudio.current)essayAudio.current.playbackRate=value}}>{[.7,.8,.9,1,1.1,1.2].map(s=><option key={s} value={s}>{s.toFixed(1)}×</option>)}</select></label>
+   <label><input type="checkbox" checked={audioRepeat} onChange={e=>{repeatRef.current=e.target.checked;setAudioRepeat(e.target.checked)}}/> 선택 문단 반복</label>
   </div>
-  <div style={{display:"flex",gap:10,flexWrap:"wrap",alignItems:"center"}}>
-   <button type="button" disabled={index===0} onClick={()=>{setIndex(i=>i-1);setHidden(false)}}>← 이전 문장</button>
-   <span aria-live="polite">{index+1} / {essayLines.length}</span>
-   <button type="button" disabled={index===essayLines.length-1} onClick={()=>{setIndex(i=>i+1);setHidden(false)}}>다음 문장 →</button>
-   <button type="button" onClick={()=>setHidden(v=>!v)}>{hidden?"문장 보기":"문장 숨기기"}</button>
+  <div style={rowStyle}>
+   <button type="button" style={buttonStyle} disabled={index===0} onClick={()=>chooseParagraph(index-1)}>← 이전 문단</button>
+   <strong aria-live="polite">{index+1} / 4 · {labels[index]}</strong>
+   <button type="button" style={buttonStyle} disabled={index===3} onClick={()=>chooseParagraph(index+1)}>다음 문단 →</button>
+   <button type="button" style={buttonStyle} onClick={()=>setHidden(v=>!v)}>{hidden?"문단 보기":"문단 숨기기"}</button>
   </div>
-  <p style={{fontSize:"clamp(18px,2vw,23px)",lineHeight:1.8,padding:16,background:"#10161f",borderRadius:10}}>{hidden?"문장을 떠올려 말하거나 써보세요.":essayLines[index]}</p>
-  <button type="button" aria-expanded={showAll} onClick={()=>setShowAll(v=>!v)}>{showAll?"에세이 전체 접기":"에세이 전체 보기"}</button>
-  {showAll&&<div>{essayParagraphs.map((p,i)=><p key={i} style={{fontSize:18,lineHeight:1.8}}><strong style={{color:"#62d394"}}>{["서론","본론 1 · 장점","본론 2 · 단점","결론"][i]}</strong><br/>{p}</p>)}</div>}
+  <p style={{fontSize:"clamp(18px,2vw,23px)",lineHeight:1.8,padding:16,background:"#10161f",borderRadius:10}}>{hidden?"선택한 문단을 떠올려 말하거나 써보세요.":essayParagraphs[index]}</p>
+  {error&&<p role="alert" style={{color:"#ff7e8c"}}>{error}</p>}
+  <p style={{color:"#9aa7b8",fontSize:13,lineHeight:1.6}}>{boundaryNote}</p>
+  {bounds&&<details style={{marginBottom:16}}><summary style={{cursor:"pointer"}}>문단 시작·끝 조정 ({formatTime(bounds[index])}–{formatTime(bounds[index+1])})</summary>
+   <p style={{color:"#9aa7b8",fontSize:13}}>초 단위로 조정합니다. 한 문단의 끝은 다음 문단의 시작과 연결됩니다.</p>
+   <div style={rowStyle}><label>시작(초) <input aria-label="선택 문단 시작 초" type="number" step=".1" disabled={index===0} value={Number(bounds[index].toFixed(1))} onChange={e=>changeBoundary("start",e.target.value)} style={{width:85}}/></label>
+   <label>끝(초) <input aria-label="선택 문단 끝 초" type="number" step=".1" disabled={index===3} value={Number(bounds[index+1].toFixed(1))} onChange={e=>changeBoundary("end",e.target.value)} style={{width:85}}/></label>
+   <button type="button" style={buttonStyle} onClick={resetBoundaries}>문단 경계 초기화</button></div>
+  </details>}
+  <button type="button" style={buttonStyle} aria-expanded={showAll} onClick={()=>setShowAll(v=>!v)}>{showAll?"에세이 전체 접기":"에세이 전체 보기"}</button>
+  {showAll&&<div>{essayParagraphs.map((p,i)=><p key={i} style={{fontSize:18,lineHeight:1.8}}><strong style={{color:"#62d394"}}>{labels[i]}</strong><br/>{p}</p>)}</div>}
  </section>
 }
 
