@@ -8,8 +8,16 @@ const TOKEN_RE=/[A-Za-z0-9]+(?:['’][A-Za-z0-9]+)*(?:-[A-Za-z0-9]+)*/g;
 function words(text){return (text.match(TOKEN_RE)||[]).map(x=>x.toLowerCase().replace(/’/g,"'"));}
 function gradeAnswer(expectedText,answer){
  const expected=words(expectedText),actual=words(answer);
- let cursor=0;
- const matches=expected.map(word=>{while(cursor<actual.length&&actual[cursor]!==word)cursor++;if(cursor>=actual.length)return false;cursor++;return true});
+ const rows=Array.from({length:expected.length+1},()=>Array(actual.length+1).fill(0));
+ for(let i=1;i<=expected.length;i++)for(let j=1;j<=actual.length;j++){
+  rows[i][j]=expected[i-1]===actual[j-1]?rows[i-1][j-1]+1:Math.max(rows[i-1][j],rows[i][j-1]);
+ }
+ const matches=Array(expected.length).fill(false);
+ let i=expected.length,j=actual.length;
+ while(i>0&&j>0){
+  if(expected[i-1]===actual[j-1]){matches[i-1]=true;i--;j--;}
+  else if(rows[i-1][j]>=rows[i][j-1])i--;else j--;
+ }
  return {expected,actual,matches,score:matches.filter(Boolean).length,total:expected.length,
   capitalized:/^[\s]*[A-Z]/.test(answer),period:/\.\s*$/.test(answer)};
 }
@@ -51,7 +59,7 @@ export default function WfdPage(){
     {testFinished?<><div className="summary">구간 완료 · {summary.score}/{summary.total} 단어</div><div className="small">{testResults.length}문항을 채점했습니다. 탭을 바꾸거나 TEST MODE를 다시 시작해 재응시할 수 있습니다.</div><div className="controls" style={{gridTemplateColumns:"1fr"}}><button className="btn primary" onClick={startTest}>다시 테스트</button></div></>:!testStarted?<><div className="hiddenAnswer">TEST MODE는 선택한 10문장 구간을 정답 없이 듣고 받아쓰기합니다.<br/>문장별 채점 뒤 다음 문제로 이동하며 마지막에 구간 합계를 보여줍니다.</div><div className="controls" style={{gridTemplateColumns:"1fr"}}><button className="btn primary" onClick={startTest}>TEST MODE 시작 · {tab.start}–{tab.end}</button></div></>:i>tabEnd?<><div className="summary">구간 완료 · {summary.score}/{summary.total} 단어</div><div className="small">{testResults.length}문항을 채점했습니다. 탭을 바꾸거나 TEST MODE를 다시 시작해 재응시할 수 있습니다.</div><div className="controls" style={{gridTemplateColumns:"1fr"}}><button className="btn primary" onClick={startTest}>다시 테스트</button></div></>:<>
      <div className="phase">{phase}</div><div className="controls" style={{gridTemplateColumns:"1fr"}}><button className="btn" onClick={playTestAudio}>🔊 문제 듣기 / 다시 듣기</button></div>
      <label className="small" htmlFor="wfd-answer">답안을 입력하세요. 문장 첫 글자는 대문자, 끝에는 마침표를 입력합니다.</label><textarea id="wfd-answer" className="testInput" value={testText} onChange={e=>setTestText(e.target.value)} placeholder="들은 문장을 입력하세요" disabled={testSubmitted}/>
-     {!testSubmitted?<button className="btn primary" onClick={submitTest} disabled={!testText.trim()}>답안 제출 및 채점</button>:<div className="testResult"><div className="score">{testGrade.score}/{testGrade.total} 단어 정답</div><div className="resultWords">{testGrade.expected.map((word,index)=><span key={index} className={`word ${testGrade.matches[index]?"ok":""}`}>{word}{testGrade.matches[index]?" ✓":" · 오답"}</span>)}</div><div className="small">첫 글자 대문자: {testGrade.capitalized?"확인":"미확인"} · 문장 끝 마침표: {testGrade.period?"확인":"미확인"}</div><div className="small">입력한 단어를 순서대로 확인합니다. 중간의 불필요한 단어는 감점 없이 건너뛰며, 정답 단어가 앞뒤 순서에 맞으면 점수로 인정합니다.</div><div className="small" style={{marginTop:10}}>정답: <strong>{item.en}</strong></div><button className="btn primary" style={{width:"100%",marginTop:14}} onClick={nextTest}>{i>=tabEnd?"구간 결과 보기":"다음 문제 →"}</button></div>}
+     {!testSubmitted?<button className="btn primary" onClick={submitTest} disabled={!testText.trim()}>답안 제출 및 채점</button>:<div className="testResult"><div className="score">{testGrade.score}/{testGrade.total} 단어 정답</div><div className="resultWords">{testGrade.expected.map((word,index)=><span key={index} className={`word ${testGrade.matches[index]?"ok":""}`}>{word}{testGrade.matches[index]?" ✓":" · 오답"}</span>)}</div><div className="small">첫 글자 대문자: {testGrade.capitalized?"확인":"미확인"} · 문장 끝 마침표: {testGrade.period?"확인":"미확인"}</div><div className="small">빠진 단어와 틀린 단어는 건너뛰고, 뒤의 단어가 정답 순서에 맞으면 각각 점수로 인정합니다.</div><div className="small" style={{marginTop:10}}>정답: <strong>{item.en}</strong></div><button className="btn primary" style={{width:"100%",marginTop:14}} onClick={nextTest}>{i>=tabEnd?"구간 결과 보기":"다음 문제 →"}</button></div>}
     </>}
    </>}
    <audio ref={audio} preload="auto"/>
