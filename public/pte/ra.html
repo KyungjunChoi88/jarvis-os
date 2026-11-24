@@ -323,4 +323,4 @@ function toggle(){
 $('speakNow').onclick=speakNow;$('endSet').onclick=finishSet;$('micReady').onclick=prepareMic;$('start').onclick=start;$('next').onclick=()=>go(1);$('prev').onclick=()=>go(-1);$('pause').onclick=toggle;
 document.addEventListener('keydown',e=>{if(e.target.closest('button,input,textarea,select'))return;if(e.code==='Space'){e.preventDefault();toggle()}if(e.key.toLowerCase()==='r')start()});controls();
 window.addEventListener('beforeunload',()=>{cancelAnimationFrame(meterFrame);meterSource?.disconnect();meterContext?.close().catch(()=>{});runGeneration++;releaseRecordings();if(recordingStream)recordingStream.getTracks().forEach(t=>t.stop());stopRecognition()});
-</script></body></html>
+</script><script src="/pte/wordbook-capture.js" defer></script></body></html>

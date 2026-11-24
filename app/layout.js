@@ -1,3 +1,5 @@
+import Script from "next/script";
+
 export const metadata = {
   title: "Kyungjun Jarvis OS V3"
 };
@@ -10,7 +12,7 @@ export const viewport = {
 export default function RootLayout({ children }) {
   return (
     <html lang="ko">
-      <body>{children}</body>
+      <body>{children}<Script src="/pte/wordbook-capture.js" strategy="afterInteractive" /></body>
     </html>
   );
 }
