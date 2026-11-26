@@ -100,7 +100,8 @@ export default function EssayPage(){
  },[progressLoaded,all.length]);
  const btn={minHeight:40,border:"1px solid #444",borderRadius:8,padding:"0 12px",background:"#252525",color:"#fff",cursor:"pointer"};
  const card={border:"1px solid #303030",background:"#181818",borderRadius:12,padding:"20px clamp(16px,3vw,28px)",marginTop:18};
- const label={fontWeight:800,fontSize:16,margin:"18px 0 10px"};\n const doneCount=completeCount, untouchedCount=Math.max(0,all.length-doneCount-activeCount);
+ const label={fontWeight:800,fontSize:16,margin:"18px 0 10px"};
+ const doneCount=completeCount, untouchedCount=Math.max(0,all.length-doneCount-activeCount);
  return <main style={{minHeight:"100vh",padding:"24px clamp(14px,3vw,36px)",background:"#111",color:"#f5f5f5",fontFamily:"Inter, Pretendard, 'Noto Sans KR', system-ui, sans-serif"}}><div style={{maxWidth:1000,margin:"0 auto"}}>
  <a href="/" style={{color:"#bbb",textDecoration:"none"}}>← JARVIS 홈</a><header style={{margin:"20px 0 16px"}}><div style={{fontSize:13,color:"#b8b8b8",fontWeight:700}}>PTE 에세이 키워드 연습</div><h1 style={{fontSize:"clamp(26px,4vw,36px)",margin:"7px 0 10px"}}>지문 · 해석 · 키워드</h1><p style={{color:"#c3c3c3",lineHeight:1.6}}>내가 정리한 키워드는 그대로 두고, 뜻을 보며 직접 입력해 연습할 수 있어요.</p></header>
  <section style={{...card,marginTop:12,padding:16}}>
