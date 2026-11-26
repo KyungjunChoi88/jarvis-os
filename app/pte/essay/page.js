@@ -83,7 +83,6 @@ export default function EssayPage(){
  function openQuestion(index){
   const q=all[index];if(!q)return;
   const statuses={...(progress.statuses||{})};
-  if(!statuses[q.id])statuses[q.id]="learning";
   const next={...progress,statuses,lastIndex:index,lastId:q.id,lastStudiedAt:new Date().toISOString()};
   setSelected(index);persistProgress(next);
  }
@@ -101,14 +100,14 @@ export default function EssayPage(){
  const btn={minHeight:40,border:"1px solid #444",borderRadius:8,padding:"0 12px",background:"#252525",color:"#fff",cursor:"pointer"};
  const card={border:"1px solid #303030",background:"#181818",borderRadius:12,padding:"20px clamp(16px,3vw,28px)",marginTop:18};
  const label={fontWeight:800,fontSize:16,margin:"18px 0 10px"};
- const doneCount=completeCount, untouchedCount=Math.max(0,all.length-doneCount-activeCount);
+ const doneCount=completeCount, untouchedCount=Math.max(0,all.length-doneCount-activeCount);\n const lastViewDate=progress.lastStudiedAt?new Date(progress.lastStudiedAt).toLocaleString("ko-KR",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"}):"";
  return <main style={{minHeight:"100vh",padding:"24px clamp(14px,3vw,36px)",background:"#111",color:"#f5f5f5",fontFamily:"Inter, Pretendard, 'Noto Sans KR', system-ui, sans-serif"}}><div style={{maxWidth:1000,margin:"0 auto"}}>
  <a href="/" style={{color:"#bbb",textDecoration:"none"}}>← JARVIS 홈</a><header style={{margin:"20px 0 16px"}}><div style={{fontSize:13,color:"#b8b8b8",fontWeight:700}}>PTE 에세이 키워드 연습</div><h1 style={{fontSize:"clamp(26px,4vw,36px)",margin:"7px 0 10px"}}>지문 · 해석 · 키워드</h1><p style={{color:"#c3c3c3",lineHeight:1.6}}>내가 정리한 키워드는 그대로 두고, 뜻을 보며 직접 입력해 연습할 수 있어요.</p></header>
  <section style={{...card,marginTop:12,padding:16}}>
   <div style={{display:"flex",justifyContent:"space-between",gap:12,flexWrap:"wrap",alignItems:"center"}}><strong>내 에세이 진도</strong><span style={{color:"#aaa",fontSize:13}}>{progressSync}{authRequired&&<a href="/api/auth/signin?callbackUrl=%2Fpte%2Fessay" style={{color:"#9ec9ff",marginLeft:8}}>Google 로그인해 기기 간 동기화</a>}</span></div>
   <div style={{display:"flex",gap:10,flexWrap:"wrap",marginTop:12,fontSize:14}}><span>완료 {doneCount}/{all.length}</span><span>학습 중 {activeCount}</span><span>미학습 {untouchedCount}</span><span>{progressPercent}%</span></div>
   <div style={{height:8,background:"#333",borderRadius:9,overflow:"hidden",marginTop:10}}><div style={{height:"100%",width:progressPercent+"%",background:"#62d394",transition:"width .2s"}}/></div>
-  <div style={{fontSize:12,color:"#aaa",marginTop:9}}>마지막 학습 문항: {progress.lastId||"아직 없음"}</div>
+  <div style={{fontSize:12,color:"#aaa",marginTop:9}}>마지막으로 본 문항: {progress.lastId||"아직 없음"}{lastViewDate?" · "+lastViewDate:""}</div>
  </section>
  <div style={{display:"grid",gridTemplateColumns:"minmax(0,1fr) auto",gap:10}}><input value={query} onChange={e=>{setQuery(e.target.value);setSelected(0)}} placeholder="문항 또는 지문 검색" aria-label="문항 검색" style={{minWidth:0,minHeight:44,padding:"0 12px",borderRadius:8,border:"1px solid #444",background:"#1b1b1b",color:"#fff",fontSize:15}}/><button type="button" onClick={()=>{setPractice(v=>!v);setReveal({});setAnswers({})}} style={{...btn,background:practice?"#315d40":"#252525"}}>{practice?"연습 종료":"키워드 가리고 연습"}</button></div>
  {loading?<p style={{marginTop:20}}>지문을 불러오는 중...</p>:!item?<p style={{marginTop:20}}>검색 결과가 없습니다.</p>:<>
