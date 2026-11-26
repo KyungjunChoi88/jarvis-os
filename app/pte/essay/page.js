@@ -41,7 +41,7 @@ const normalize=x=>x.toLowerCase().replace(/[.,!?;:]/g,"").replace(/\s+/g," ").t
 function gloss(k){return k.ko||G[k.en]||"뜻 추가 예정";}
 export default function EssayPage(){
  const [source,setSource]=useState(""),[loading,setLoading]=useState(true),[query,setQuery]=useState(""),[practice,setPractice]=useState(false),[reveal,setReveal]=useState({}),[answers,setAnswers]=useState({}),[selected,setSelected]=useState(0);
- const [progress,setProgress]=useState({statuses:{},lastIndex:0,lastId:"",lastStudiedAt:""}),[progressSync,setProgressSync]=useState("진도 기록 불러오는 중"),[progressLoaded,setProgressLoaded]=useState(false);
+ const [progress,setProgress]=useState({statuses:{},lastIndex:0,lastId:"",lastStudiedAt:""}),[progressSync,setProgressSync]=useState("진도 기록 불러오는 중"),[progressLoaded,setProgressLoaded]=useState(false),[authRequired,setAuthRequired]=useState(false);
  const saveQueue=useRef(Promise.resolve()),progressKey="jarvis-essay-progress-v1",progressWeek="2000-01-03";
  useEffect(()=>{fetch("/essay-keywords.txt").then(r=>r.text()).then(setSource).finally(()=>setLoading(false));},[]);
  useEffect(()=>{
@@ -51,14 +51,14 @@ export default function EssayPage(){
    const local=readLocal(),empty=!local||!Object.keys(local.statuses||{}).length;
    try{
     const r=await fetch("/api/pte-progress?week="+progressWeek,{cache:"no-store"}),data=await r.json();
-    if(!r.ok)throw Error(data.error||"server unavailable");
+    if(!r.ok){const e=Error(data.error||"server unavailable");e.status=r.status;throw e}
     const raw=data.entries?.find(x=>x.item==="memo")?.memo||"",saved=raw?JSON.parse(raw):{};
     const remote=saved.essayProgress;
     const loaded=remote&&typeof remote==="object"?remote:(empty?{statuses:{},lastIndex:0,lastId:"",lastStudiedAt:""}:local);
     if(active){setProgress(loaded);setSelected(Number.isInteger(loaded.lastIndex)?loaded.lastIndex:0);setProgressSync("기기 간 기록 연결됨");setProgressLoaded(true)}
     if(!remote&&!empty) persistProgress(loaded);
-   }catch{
-    if(active){setProgress(local);setSelected(Number.isInteger(local.lastIndex)?local.lastIndex:0);setProgressSync("이 기기에 저장 중 · 로그인 후 기기 간 동기화");setProgressLoaded(true)}
+   }catch(error){
+    if(active){setProgress(local);setSelected(Number.isInteger(local.lastIndex)?local.lastIndex:0);setAuthRequired(error.status===401);setProgressSync(error.status===401?"이 기기에 저장 중":"이 기기에 저장됨 · 서버 연결을 확인해 주세요");setProgressLoaded(true)}
    }
   })();
   return()=>{active=false};
@@ -76,9 +76,9 @@ export default function EssayPage(){
   const memo=JSON.stringify({essayProgress:next});
   saveQueue.current=saveQueue.current.catch(()=>{}).then(async()=>{
    const r=await fetch("/api/pte-progress",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({week:progressWeek,item:"memo",day:0,memo})});
-   if(!r.ok)throw Error("save failed");
-   setProgressSync("다른 기기와 동기화됨");
-  }).catch(()=>setProgressSync("이 기기에 저장됨 · 서버 연결을 확인해 주세요"));
+   if(!r.ok){const data=await r.json().catch(()=>({}));const e=Error(data.error||"save failed");e.status=r.status;throw e}
+   setAuthRequired(false);setProgressSync("다른 기기와 동기화됨");
+  }).catch(e=>{if(e.status===401)setAuthRequired(true);setProgressSync(e.status===401?"이 기기에 저장됨":"이 기기에 저장됨 · 서버 연결을 확인해 주세요")});
  }
  function openQuestion(index){
   const q=all[index];if(!q)return;
@@ -105,7 +105,7 @@ export default function EssayPage(){
  return <main style={{minHeight:"100vh",padding:"24px clamp(14px,3vw,36px)",background:"#111",color:"#f5f5f5",fontFamily:"Inter, Pretendard, 'Noto Sans KR', system-ui, sans-serif"}}><div style={{maxWidth:1000,margin:"0 auto"}}>
  <a href="/" style={{color:"#bbb",textDecoration:"none"}}>← JARVIS 홈</a><header style={{margin:"20px 0 16px"}}><div style={{fontSize:13,color:"#b8b8b8",fontWeight:700}}>PTE 에세이 키워드 연습</div><h1 style={{fontSize:"clamp(26px,4vw,36px)",margin:"7px 0 10px"}}>지문 · 해석 · 키워드</h1><p style={{color:"#c3c3c3",lineHeight:1.6}}>내가 정리한 키워드는 그대로 두고, 뜻을 보며 직접 입력해 연습할 수 있어요.</p></header>
  <section style={{...card,marginTop:12,padding:16}}>
-  <div style={{display:"flex",justifyContent:"space-between",gap:12,flexWrap:"wrap",alignItems:"center"}}><strong>내 에세이 진도</strong><span style={{color:"#aaa",fontSize:13}}>{progressSync}</span></div>
+  <div style={{display:"flex",justifyContent:"space-between",gap:12,flexWrap:"wrap",alignItems:"center"}}><strong>내 에세이 진도</strong><span style={{color:"#aaa",fontSize:13}}>{progressSync}{authRequired&&<a href="/api/auth/signin?callbackUrl=%2Fpte%2Fessay" style={{color:"#9ec9ff",marginLeft:8}}>Google 로그인해 기기 간 동기화</a>}</span></div>
   <div style={{display:"flex",gap:10,flexWrap:"wrap",marginTop:12,fontSize:14}}><span>완료 {doneCount}/{all.length}</span><span>학습 중 {activeCount}</span><span>미학습 {untouchedCount}</span><span>{progressPercent}%</span></div>
   <div style={{height:8,background:"#333",borderRadius:9,overflow:"hidden",marginTop:10}}><div style={{height:"100%",width:progressPercent+"%",background:"#62d394",transition:"width .2s"}}/></div>
   <div style={{fontSize:12,color:"#aaa",marginTop:9}}>마지막 학습 문항: {progress.lastId||"아직 없음"}</div>
