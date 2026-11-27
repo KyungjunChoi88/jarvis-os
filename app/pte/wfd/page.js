@@ -46,7 +46,7 @@ export default function WfdPage(){
  function korean(t){return new Promise(resolve=>{if(!("speechSynthesis" in window))return resolve();let done=false;const finish=()=>{if(done)return;done=true;cancelResolve.current=null;resolve()};cancelResolve.current=finish;const s=window.speechSynthesis,u=new SpeechSynthesisUtterance(t);u.lang="ko-KR";u.rate=.92;u.volume=1;const voices=s.getVoices(),v=koVoice.current||voices.find(x=>x.lang?.toLowerCase()==="ko-kr")||voices.find(x=>x.lang?.toLowerCase().startsWith("ko"));if(v){u.voice=v;koVoice.current=v}u.onend=finish;u.onerror=finish;s.cancel();s.resume();s.speak(u)})}
  async function run(start=i){
   halt();stop.current=false;primeKorean();
-  const repeatMode=loopMode,group=TABS[Math.floor(start/10)],firstIndex=repeatMode==="all50"?0:start,endIndex=repeatMode==="all50"?Math.min(49,WFD.length-1):group.end-1;
+  const repeatMode=loopMode,group=TABS[Math.floor(start/10)],firstIndex=repeatMode==="all50"?0:repeatMode==="ten"?group.start-1:start,endIndex=repeatMode==="all50"?Math.min(49,WFD.length-1):group.end-1;
   const first=WFD[firstIndex];if(audio.current&&first?.audio){audio.current.src=first.audio;audio.current.volume=1;audio.current.load()}
   setPlaying(true);let n=firstIndex;
   while(!stop.current&&(repeatMode!=="once"||n<=endIndex)){
